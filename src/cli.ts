@@ -8,7 +8,9 @@ import { saveReview } from './commands/review';
 import { saveInstruction } from './commands/instruction';
 import { gateCommand } from './commands/gate';
 import { listPlans } from './commands/ls';
-import { checkRun } from './commands/run';
+import { startImplementation } from './commands/start';
+import { saveImpl } from './commands/impl';
+import { saveImplReview } from './commands/impl-review';
 
 const repoName = getRepoName();
 
@@ -38,8 +40,8 @@ const program = new Command();
 
 program
   .name('vdev')
-  .description('Plan management CLI')
-  .version('0.1.0');
+  .description('Plan management CLI v2.0')
+  .version('2.0.0');
 
 program
   .command('new <name>')
@@ -94,7 +96,7 @@ program
 
 program
   .command('review <topic>')
-  .description('Save review.md from stdin')
+  .description('Save design-review.md from stdin')
   .option('--stdin', 'Read from stdin')
   .action(async (topic: string, options: { stdin?: boolean }) => {
     if (!options.stdin) {
@@ -112,24 +114,62 @@ program
   });
 
 program
+  .command('start <topic>')
+  .description('Start implementation (DESIGN_APPROVED -> IMPLEMENTING)')
+  .action((topic: string) => {
+    const result = startImplementation(topic);
+    if (result.success) {
+      output(`IMPLEMENTING\t${topic}`);
+    } else {
+      error(result.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('impl <topic>')
+  .description('Save impl.md from stdin')
+  .option('--stdin', 'Read from stdin')
+  .action(async (topic: string, options: { stdin?: boolean }) => {
+    if (!options.stdin) {
+      error('--stdin flag required');
+      process.exit(1);
+    }
+    const content = await readStdin();
+    const result = saveImpl(topic, content);
+    if (result.success) {
+      output(`IMPL_SAVED\t${result.topic}`);
+    } else {
+      error(result.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('impl-review <topic>')
+  .description('Save impl-review.md from stdin')
+  .option('--stdin', 'Read from stdin')
+  .action(async (topic: string, options: { stdin?: boolean }) => {
+    if (!options.stdin) {
+      error('--stdin flag required');
+      process.exit(1);
+    }
+    const content = await readStdin();
+    const result = saveImplReview(topic, content);
+    if (result.success) {
+      output(`IMPL_REVIEW_SAVED\t${result.topic}\t${result.status}`);
+    } else {
+      error(result.message);
+      process.exit(1);
+    }
+  });
+
+program
   .command('gate <topic>')
   .description('Check gate status for a topic')
   .action((topic: string) => {
     const result = gateCommand(topic);
     output(`${result.status}\t${topic}\t${result.message}`);
-    process.exit(result.exitCode);
-  });
-
-program
-  .command('run <topic>')
-  .description('Check if implementation is allowed')
-  .action((topic: string) => {
-    const result = checkRun(topic);
-    if (result.allowed) {
-      output(`RUN_ALLOWED\t${topic}`);
-    } else {
-      output(`RUN_BLOCKED\t${topic}\t${result.status}`);
-    }
     process.exit(result.exitCode);
   });
 

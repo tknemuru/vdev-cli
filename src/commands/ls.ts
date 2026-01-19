@@ -1,4 +1,4 @@
-import { readdirSync, existsSync } from 'fs';
+import { readdirSync, existsSync, readFileSync } from 'fs';
 import { getPlansDir, getMetaPath } from '../core/paths';
 import { readMeta } from '../core/meta';
 
@@ -31,12 +31,22 @@ export function listPlans(): LsEntry[] {
 
       const metaResult = readMeta(topic);
       if (!metaResult.success) {
-        entries.push({
-          topic,
-          status: 'BROKEN_STATE',
-          title: '',
-          updatedAt: '',
-        });
+        // Check if it's a v1 schema
+        if (metaResult.isV1Schema) {
+          entries.push({
+            topic,
+            status: 'V1_SCHEMA',
+            title: '-',
+            updatedAt: '-',
+          });
+        } else {
+          entries.push({
+            topic,
+            status: 'BROKEN_STATE',
+            title: '',
+            updatedAt: '',
+          });
+        }
         continue;
       }
 
@@ -54,8 +64,8 @@ export function listPlans(): LsEntry[] {
 
   // Sort by updatedAt descending
   entries.sort((a, b) => {
-    if (!a.updatedAt) return 1;
-    if (!b.updatedAt) return -1;
+    if (!a.updatedAt || a.updatedAt === '-') return 1;
+    if (!b.updatedAt || b.updatedAt === '-') return -1;
     return b.updatedAt.localeCompare(a.updatedAt);
   });
 
