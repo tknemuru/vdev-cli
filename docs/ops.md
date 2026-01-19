@@ -237,3 +237,25 @@ plan/review/start/impl/impl-review は前提条件を満たさない場合に CO
 
 - vdev フローの変更時に複数リポジトリを手動修正する事態を避けるため、
   CLAUDE.md は単一正本運用とする。
+
+### 同期コマンド
+
+```bash
+# 差分確認（同期しない）
+vdev sync
+
+# 強制同期
+vdev sync --force
+```
+
+### vdev new 実行時の同期
+
+- vdev new は内部で sync 相当を実行する
+- 差分がある場合（--force なし）:
+  - topic は作成される
+  - 同期のみ失敗し exit=1
+  - stderr に `vdev sync --force` の案内を出力
+- --force は同期のみに作用（topic 作成の意味は変えない）
+- グローバル正本（~/.vdev/CLAUDE.md）が存在しない場合:
+  - topic は作成される
+  - 同期は失敗し exit=1

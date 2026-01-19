@@ -180,13 +180,17 @@ hash 一致条件：
 
 新しい計画トピックを作成する。
 
-vdev new <name>
+vdev new <name> [--force]
 
 動作：
 1. <name> を slug 化
 2. 今日の日付（JST）をプレフィックスに付与
 3. docs/plans/<topic>/ ディレクトリを作成
 4. meta.json を初期状態で作成
+5. グローバル正本（~/.vdev/CLAUDE.md）から repo の CLAUDE.md を同期
+   - --force なし: 差分があれば同期のみ失敗（topic は作成済み）、exit 1
+   - --force あり: 差分があっても上書き、exit 0
+   - グローバル正本が存在しない場合: topic は作成済み、同期失敗、exit 1
 
 初期状態：
 - schemaVersion: 2
@@ -195,7 +199,7 @@ vdev new <name>
 
 Exit Codes：
 - 0: 成功
-- 1: エラー（既存 topic 等）
+- 1: エラー（既存 topic、同期失敗等）
 
 ---
 
@@ -386,6 +390,31 @@ REPO=<repo>\t<topic>\t<status>\t<title>\t<updatedAt>
 
 Broken Topic：
 - status に BROKEN_STATE を表示する
+
+---
+
+### 9.11 vdev sync
+
+repo の CLAUDE.md をグローバル正本に同期する。
+
+vdev sync [--force]
+
+動作：
+1. ~/.vdev/CLAUDE.md（グローバル正本）を読み取る
+2. 自動生成ヘッダ付きで repo 用 CLAUDE.md を生成
+3. 差分判定を行う（Last synced 行は比較対象から除外）
+
+デフォルト挙動（--force なし）：
+- 差分があれば stderr にエラーメッセージを出力し exit 1
+- 上書きは行わない
+
+--force 指定時：
+- 差分があっても常に上書き
+- exit 0
+
+Exit Codes：
+- 0: 成功
+- 1: 差分検出（forceなし）またはエラー
 
 ---
 
