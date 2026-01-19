@@ -32,6 +32,14 @@ export function getPlanPath(topic: string): string {
   return join(getTopicDir(topic), 'plan.md');
 }
 
-export function getReviewPath(topic: string): string {
-  return join(getTopicDir(topic), 'review.md');
+export function getDesignReviewPath(topic: string): string {
+  return join(getTopicDir(topic), 'design-review.md');
+}
+
+export function getImplPath(topic: string): string {
+  return join(getTopicDir(topic), 'impl.md');
+}
+
+export function getImplReviewPath(topic: string): string {
+  return join(getTopicDir(topic), 'impl-review.md');
 }

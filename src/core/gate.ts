@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { ExitCode, ExitCodeValue } from './errors';
-import { readMeta } from './meta';
-import { getInstructionPath, getPlanPath, getReviewPath } from './paths';
+import { readMeta, Meta } from './meta';
+import { getInstructionPath, getPlanPath, getDesignReviewPath, getImplPath, getImplReviewPath } from './paths';
 import { sha256 } from './hashes';
 import { normalizeLF } from './normalize';
 
@@ -9,6 +9,37 @@ export interface GateResult {
   exitCode: ExitCodeValue;
   status: string;
   message: string;
+}
+
+function hashMatches(expectedHash: string | null, filePath: string): boolean {
+  if (!expectedHash) return false;
+  if (!existsSync(filePath)) return false;
+  const content = normalizeLF(readFileSync(filePath, 'utf8'));
+  return sha256(content) === expectedHash;
+}
+
+function designHashesMatch(meta: Meta, topic: string): boolean {
+  const planPath = getPlanPath(topic);
+  const designReviewPath = getDesignReviewPath(topic);
+
+  return (
+    hashMatches(meta.hashes.planSha256, planPath) &&
+    hashMatches(meta.hashes.designReviewSha256, designReviewPath)
+  );
+}
+
+function allHashesMatch(meta: Meta, topic: string): boolean {
+  const planPath = getPlanPath(topic);
+  const designReviewPath = getDesignReviewPath(topic);
+  const implPath = getImplPath(topic);
+  const implReviewPath = getImplReviewPath(topic);
+
+  return (
+    hashMatches(meta.hashes.planSha256, planPath) &&
+    hashMatches(meta.hashes.designReviewSha256, designReviewPath) &&
+    hashMatches(meta.hashes.implSha256, implPath) &&
+    hashMatches(meta.hashes.implReviewSha256, implReviewPath)
+  );
 }
 
 export function checkGate(topic: string): GateResult {
@@ -25,29 +56,29 @@ export function checkGate(topic: string): GateResult {
   const meta = metaResult.meta;
   const instructionPath = getInstructionPath(topic);
   const planPath = getPlanPath(topic);
-  const reviewPath = getReviewPath(topic);
+  const designReviewPath = getDesignReviewPath(topic);
+  const implPath = getImplPath(topic);
+  const implReviewPath = getImplReviewPath(topic);
 
-  // Priority 2: status=APPROVED/REJECTED with hash mismatch
-  if (meta.status === 'APPROVED' || meta.status === 'REJECTED') {
-    const planExists = existsSync(planPath);
-    const reviewExists = existsSync(reviewPath);
-
-    if (planExists && reviewExists) {
-      const planContent = normalizeLF(readFileSync(planPath, 'utf8'));
-      const reviewContent = normalizeLF(readFileSync(reviewPath, 'utf8'));
-      const planHash = sha256(planContent);
-      const reviewHash = sha256(reviewContent);
-
-      const hashMismatch =
-        meta.hashes.planSha256 !== planHash || meta.hashes.reviewSha256 !== reviewHash;
-
-      if (hashMismatch) {
-        return {
-          exitCode: ExitCode.BROKEN_STATE,
-          status: 'BROKEN_STATE',
-          message: 'hash mismatch in APPROVED/REJECTED state',
-        };
-      }
+  // Priority 2: status in (DONE, REJECTED) with hash mismatch
+  // DONE requires all 4 hashes to match
+  // REJECTED only requires plan + designReview hashes (no impl files)
+  if (meta.status === 'DONE') {
+    if (!allHashesMatch(meta, topic)) {
+      return {
+        exitCode: ExitCode.BROKEN_STATE,
+        status: 'BROKEN_STATE',
+        message: 'hash mismatch in DONE/REJECTED state',
+      };
+    }
+  }
+  if (meta.status === 'REJECTED') {
+    if (!designHashesMatch(meta, topic)) {
+      return {
+        exitCode: ExitCode.BROKEN_STATE,
+        status: 'BROKEN_STATE',
+        message: 'hash mismatch in DONE/REJECTED state',
+      };
     }
   }
 
@@ -69,47 +100,74 @@ export function checkGate(topic: string): GateResult {
     };
   }
 
-  // Priority 5: review.md missing
-  if (!existsSync(reviewPath)) {
+  // Priority 5: design-review.md missing
+  if (!existsSync(designReviewPath)) {
     return {
-      exitCode: ExitCode.NEEDS_REVIEW,
-      status: 'NEEDS_REVIEW',
-      message: 'review.md not found',
+      exitCode: ExitCode.NEEDS_DESIGN_REVIEW,
+      status: 'NEEDS_DESIGN_REVIEW',
+      message: 'design-review.md not found',
     };
   }
 
-  // Priority 6: status=NEEDS_CHANGES
-  if (meta.status === 'NEEDS_CHANGES') {
-    return {
-      exitCode: ExitCode.NEEDS_CHANGES,
-      status: 'NEEDS_CHANGES',
-      message: 'changes requested',
-    };
-  }
-
-  // Priority 7: status=REJECTED
+  // Priority 6: status=REJECTED
   if (meta.status === 'REJECTED') {
     return {
       exitCode: ExitCode.REJECTED,
       status: 'REJECTED',
-      message: 'plan rejected',
+      message: 'rejected',
     };
   }
 
-  // Priority 8: status=APPROVED with hash match
-  if (meta.status === 'APPROVED') {
+  // Priority 7: status=DESIGN_APPROVED
+  if (meta.status === 'DESIGN_APPROVED') {
     return {
-      exitCode: ExitCode.APPROVED,
-      status: 'APPROVED',
+      exitCode: ExitCode.DESIGN_APPROVED,
+      status: 'DESIGN_APPROVED',
       message: 'ready to implement',
     };
   }
 
-  // Other status values (NEEDS_INSTRUCTION, NEEDS_PLAN, NEEDS_REVIEW as meta status)
-  // but files exist - treat as needing review update
+  // Priority 8: status=IMPLEMENTING and impl.md missing
+  if (meta.status === 'IMPLEMENTING') {
+    if (!existsSync(implPath)) {
+      return {
+        exitCode: ExitCode.NEEDS_IMPL_REPORT,
+        status: 'NEEDS_IMPL_REPORT',
+        message: 'impl.md not found',
+      };
+    }
+    // Priority 9: status=IMPLEMENTING and impl.md exists but impl-review.md missing
+    if (!existsSync(implReviewPath)) {
+      return {
+        exitCode: ExitCode.NEEDS_IMPL_REVIEW,
+        status: 'NEEDS_IMPL_REVIEW',
+        message: 'impl-review.md not found',
+      };
+    }
+  }
+
+  // Priority 10: status=NEEDS_IMPL_REVIEW
+  if (meta.status === 'NEEDS_IMPL_REVIEW') {
+    return {
+      exitCode: ExitCode.NEEDS_IMPL_REVIEW,
+      status: 'NEEDS_IMPL_REVIEW',
+      message: 'impl-review.md not found',
+    };
+  }
+
+  // Priority 11: status=DONE with hash match
+  if (meta.status === 'DONE' && allHashesMatch(meta, topic)) {
+    return {
+      exitCode: ExitCode.DONE,
+      status: 'DONE',
+      message: 'done',
+    };
+  }
+
+  // Priority 12: Other cases → BROKEN_STATE
   return {
-    exitCode: ExitCode.NEEDS_CHANGES,
-    status: 'NEEDS_CHANGES',
-    message: `status is ${meta.status} but files exist`,
+    exitCode: ExitCode.BROKEN_STATE,
+    status: 'BROKEN_STATE',
+    message: 'broken state',
   };
 }

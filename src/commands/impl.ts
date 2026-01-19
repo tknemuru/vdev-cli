@@ -1,18 +1,17 @@
 import { writeFileSync, existsSync } from 'fs';
 import { readMeta, writeMeta } from '../core/meta';
-import { getPlanPath, getTopicDir, getInstructionPath } from '../core/paths';
+import { getImplPath, getTopicDir } from '../core/paths';
 import { sha256 } from '../core/hashes';
 import { normalizeLF } from '../core/normalize';
 import { nowJST } from '../core/time';
-import { ExitCode } from '../core/errors';
 
-export interface PlanResult {
+export interface ImplResult {
   success: boolean;
   topic: string;
   message: string;
 }
 
-export function savePlan(topic: string, content: string): PlanResult {
+export function saveImpl(topic: string, content: string): ImplResult {
   const topicDir = getTopicDir(topic);
 
   if (!existsSync(topicDir)) {
@@ -32,27 +31,27 @@ export function savePlan(topic: string, content: string): PlanResult {
     };
   }
 
-  // Precondition: instruction.md must exist
-  const instructionPath = getInstructionPath(topic);
-  if (!existsSync(instructionPath)) {
+  const meta = metaResult.meta;
+
+  // Precondition: status must be IMPLEMENTING
+  if (meta.status !== 'IMPLEMENTING') {
     return {
       success: false,
       topic,
-      message: 'instruction.md not found',
+      message: `Cannot save impl in ${meta.status} status`,
     };
   }
 
   const normalizedContent = normalizeLF(content);
-  const planPath = getPlanPath(topic);
-  writeFileSync(planPath, normalizedContent, 'utf8');
+  const implPath = getImplPath(topic);
+  writeFileSync(implPath, normalizedContent, 'utf8');
 
-  const planHash = sha256(normalizedContent);
-  const meta = metaResult.meta;
+  const implHash = sha256(normalizedContent);
 
-  // v2: plan 保存で status は NEEDS_DESIGN_REVIEW になる（設計レビューを無効化）
-  meta.status = 'NEEDS_DESIGN_REVIEW';
-  meta.hashes.planSha256 = planHash;
-  meta.hashes.designReviewSha256 = null; // 設計レビューを無効化
+  // Transition to NEEDS_IMPL_REVIEW
+  meta.status = 'NEEDS_IMPL_REVIEW';
+  meta.hashes.implSha256 = implHash;
+  meta.hashes.implReviewSha256 = null; // Invalidate impl-review
   meta.timestamps.updatedAt = nowJST();
 
   writeMeta(topic, meta);
@@ -60,6 +59,6 @@ export function savePlan(topic: string, content: string): PlanResult {
   return {
     success: true,
     topic,
-    message: 'plan saved',
+    message: 'impl saved',
   };
 }

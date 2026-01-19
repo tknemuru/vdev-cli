@@ -47,7 +47,7 @@ vdev gate 2026-01-19-auth-refresh
 
 ### Step 6: Design Review（人間/ChatGPT）
 
-cat << 'EOF' | vdev design-review 2026-01-19-auth-refresh --stdin
+cat << 'EOF' | vdev review 2026-01-19-auth-refresh --stdin
 Status: DESIGN_APPROVED
 
 Summary:
@@ -162,7 +162,7 @@ Status 行が規定フォーマットに一致しない場合、コマンドは 
 
 ### 3.2 前提条件違反
 
-plan/design-review/start/impl/impl-review は前提条件を満たさない場合に COMMAND_ERROR(1) とする。
+plan/review/start/impl/impl-review は前提条件を満たさない場合に COMMAND_ERROR(1) とする。
 （状態遷移は行わない）
 
 ---

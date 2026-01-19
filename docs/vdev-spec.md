@@ -247,11 +247,11 @@ Exit Codes：
 
 ---
 
-### 9.4 vdev design-review
+### 9.4 vdev review
 
 design-review.md を保存する（設計レビュー）。
 
-echo "Status: DESIGN_APPROVED" | vdev design-review <topic> --stdin
+echo "Status: DESIGN_APPROVED" | vdev review <topic> --stdin
 
 Status 抽出パターン：
 ^Status:\s*(DESIGN_APPROVED|REJECTED|NEEDS_CHANGES)\s*$

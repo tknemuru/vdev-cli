@@ -4,6 +4,9 @@ import { newPlan } from '../src/commands/new';
 import { savePlan } from '../src/commands/plan';
 import { saveReview } from '../src/commands/review';
 import { saveInstruction } from '../src/commands/instruction';
+import { startImplementation } from '../src/commands/start';
+import { saveImpl } from '../src/commands/impl';
+import { saveImplReview } from '../src/commands/impl-review';
 import { readMeta } from '../src/core/meta';
 import { getPlansDir, getTopicDir } from '../src/core/paths';
 
@@ -45,9 +48,10 @@ describe('new command', () => {
     const metaResult = readMeta(result.topic);
     expect(metaResult.success).toBe(true);
     if (metaResult.success) {
+      expect(metaResult.meta.schemaVersion).toBe(2);
       expect(metaResult.meta.status).toBe('NEEDS_INSTRUCTION');
-      expect(metaResult.meta.hashes.planSha256).toBe('');
-      expect(metaResult.meta.hashes.reviewSha256).toBe('');
+      expect(metaResult.meta.hashes.planSha256).toBe(null);
+      expect(metaResult.meta.hashes.designReviewSha256).toBe(null);
     }
   });
 
@@ -56,7 +60,6 @@ describe('new command', () => {
     createdTopics.push(result1.topic);
     expect(result1.success).toBe(true);
 
-    // Create a second one with the same name on the same day
     const result2 = newPlan(`${TEST_TOPIC_PREFIX}duplicate`);
     expect(result2.success).toBe(false);
     expect(result2.message).toBe('topic already exists');
@@ -107,7 +110,7 @@ describe('plan command', () => {
     }
   });
 
-  it('saves plan and sets status to NEEDS_CHANGES', () => {
+  it('saves plan and sets status to NEEDS_DESIGN_REVIEW', () => {
     const { topic } = newPlan(`${TEST_TOPIC_PREFIX}plan`);
     createdTopics.push(topic);
     saveInstruction(topic, '# Instruction');
@@ -117,10 +120,18 @@ describe('plan command', () => {
     const metaResult = readMeta(topic);
     expect(metaResult.success).toBe(true);
     if (metaResult.success) {
-      expect(metaResult.meta.status).toBe('NEEDS_CHANGES');
-      expect(metaResult.meta.hashes.planSha256).not.toBe('');
-      expect(metaResult.meta.hashes.reviewSha256).toBe('');
+      expect(metaResult.meta.status).toBe('NEEDS_DESIGN_REVIEW');
+      expect(metaResult.meta.hashes.planSha256).not.toBe(null);
+      expect(metaResult.meta.hashes.designReviewSha256).toBe(null);
     }
+  });
+
+  it('fails when instruction.md not found', () => {
+    const { topic } = newPlan(`${TEST_TOPIC_PREFIX}plan-no-inst`);
+    createdTopics.push(topic);
+    const result = savePlan(topic, '# My Plan');
+    expect(result.success).toBe(false);
+    expect(result.message).toBe('instruction.md not found');
   });
 
   it('plan update invalidates previous approval', () => {
@@ -128,13 +139,13 @@ describe('plan command', () => {
     createdTopics.push(topic);
     saveInstruction(topic, '# Instruction');
     savePlan(topic, '# Initial Plan');
-    saveReview(topic, 'Status: APPROVED');
+    saveReview(topic, 'Status: DESIGN_APPROVED');
 
-    // Verify APPROVED state
+    // Verify DESIGN_APPROVED state
     let metaResult = readMeta(topic);
     expect(metaResult.success).toBe(true);
     if (metaResult.success) {
-      expect(metaResult.meta.status).toBe('APPROVED');
+      expect(metaResult.meta.status).toBe('DESIGN_APPROVED');
     }
 
     // Update plan - should invalidate
@@ -142,7 +153,7 @@ describe('plan command', () => {
     metaResult = readMeta(topic);
     expect(metaResult.success).toBe(true);
     if (metaResult.success) {
-      expect(metaResult.meta.status).toBe('NEEDS_CHANGES');
+      expect(metaResult.meta.status).toBe('NEEDS_DESIGN_REVIEW');
     }
   });
 });
@@ -162,14 +173,14 @@ describe('review command', () => {
     }
   });
 
-  it('extracts APPROVED status', () => {
+  it('extracts DESIGN_APPROVED status', () => {
     const { topic } = newPlan(`${TEST_TOPIC_PREFIX}review-a`);
     createdTopics.push(topic);
     saveInstruction(topic, '# Instruction');
     savePlan(topic, '# Plan');
-    const result = saveReview(topic, 'Status: APPROVED\n\nLooks good!');
+    const result = saveReview(topic, 'Status: DESIGN_APPROVED\n\nLooks good!');
     expect(result.success).toBe(true);
-    expect(result.status).toBe('APPROVED');
+    expect(result.status).toBe('DESIGN_APPROVED');
   });
 
   it('extracts REJECTED status', () => {
@@ -182,25 +193,24 @@ describe('review command', () => {
     expect(result.status).toBe('REJECTED');
   });
 
-  it('extracts NEEDS_CHANGES status', () => {
+  it('extracts NEEDS_CHANGES status and transitions to NEEDS_PLAN', () => {
     const { topic } = newPlan(`${TEST_TOPIC_PREFIX}review-n`);
     createdTopics.push(topic);
     saveInstruction(topic, '# Instruction');
     savePlan(topic, '# Plan');
     const result = saveReview(topic, 'Status: NEEDS_CHANGES\n\nPlease fix X.');
     expect(result.success).toBe(true);
-    expect(result.status).toBe('NEEDS_CHANGES');
+    expect(result.status).toBe('NEEDS_PLAN'); // NEEDS_CHANGES -> NEEDS_PLAN
   });
 
-  it('falls back to NEEDS_CHANGES when status extraction fails', () => {
+  it('fails when status extraction fails', () => {
     const { topic } = newPlan(`${TEST_TOPIC_PREFIX}review-f`);
     createdTopics.push(topic);
     saveInstruction(topic, '# Instruction');
     savePlan(topic, '# Plan');
     const result = saveReview(topic, 'No status line here');
-    expect(result.success).toBe(true);
-    expect(result.status).toBe('NEEDS_CHANGES');
-    expect(result.message).toContain('status extraction failed');
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Status extraction failed');
   });
 
   it('is case insensitive for status extraction', () => {
@@ -208,8 +218,225 @@ describe('review command', () => {
     createdTopics.push(topic);
     saveInstruction(topic, '# Instruction');
     savePlan(topic, '# Plan');
-    const result = saveReview(topic, 'Status: approved');
+    const result = saveReview(topic, 'Status: design_approved');
     expect(result.success).toBe(true);
-    expect(result.status).toBe('APPROVED');
+    expect(result.status).toBe('DESIGN_APPROVED');
+  });
+});
+
+describe('start command', () => {
+  let createdTopics: string[] = [];
+
+  beforeEach(() => {
+    createdTopics = [];
+    const plansDir = getPlansDir();
+    mkdirSync(plansDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    for (const topic of createdTopics) {
+      removeTopic(topic);
+    }
+  });
+
+  it('transitions from DESIGN_APPROVED to IMPLEMENTING', () => {
+    const { topic } = newPlan(`${TEST_TOPIC_PREFIX}start`);
+    createdTopics.push(topic);
+    saveInstruction(topic, '# Instruction');
+    savePlan(topic, '# Plan');
+    saveReview(topic, 'Status: DESIGN_APPROVED');
+
+    const result = startImplementation(topic);
+    expect(result.success).toBe(true);
+
+    const metaResult = readMeta(topic);
+    expect(metaResult.success).toBe(true);
+    if (metaResult.success) {
+      expect(metaResult.meta.status).toBe('IMPLEMENTING');
+    }
+  });
+
+  it('fails when status is not DESIGN_APPROVED', () => {
+    const { topic } = newPlan(`${TEST_TOPIC_PREFIX}start-fail`);
+    createdTopics.push(topic);
+    saveInstruction(topic, '# Instruction');
+    savePlan(topic, '# Plan');
+    // Don't approve - status is NEEDS_DESIGN_REVIEW
+
+    const result = startImplementation(topic);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Cannot start');
+  });
+});
+
+describe('impl command', () => {
+  let createdTopics: string[] = [];
+
+  beforeEach(() => {
+    createdTopics = [];
+    const plansDir = getPlansDir();
+    mkdirSync(plansDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    for (const topic of createdTopics) {
+      removeTopic(topic);
+    }
+  });
+
+  it('saves impl and transitions to NEEDS_IMPL_REVIEW', () => {
+    const { topic } = newPlan(`${TEST_TOPIC_PREFIX}impl`);
+    createdTopics.push(topic);
+    saveInstruction(topic, '# Instruction');
+    savePlan(topic, '# Plan');
+    saveReview(topic, 'Status: DESIGN_APPROVED');
+    startImplementation(topic);
+
+    const result = saveImpl(topic, '# Implementation Report');
+    expect(result.success).toBe(true);
+
+    const metaResult = readMeta(topic);
+    expect(metaResult.success).toBe(true);
+    if (metaResult.success) {
+      expect(metaResult.meta.status).toBe('NEEDS_IMPL_REVIEW');
+      expect(metaResult.meta.hashes.implSha256).not.toBe(null);
+    }
+  });
+
+  it('fails when status is not IMPLEMENTING', () => {
+    const { topic } = newPlan(`${TEST_TOPIC_PREFIX}impl-fail`);
+    createdTopics.push(topic);
+    saveInstruction(topic, '# Instruction');
+    savePlan(topic, '# Plan');
+    saveReview(topic, 'Status: DESIGN_APPROVED');
+    // Don't start - status is DESIGN_APPROVED
+
+    const result = saveImpl(topic, '# Implementation Report');
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Cannot save impl');
+  });
+});
+
+describe('impl-review command', () => {
+  let createdTopics: string[] = [];
+
+  beforeEach(() => {
+    createdTopics = [];
+    const plansDir = getPlansDir();
+    mkdirSync(plansDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    for (const topic of createdTopics) {
+      removeTopic(topic);
+    }
+  });
+
+  it('extracts DONE status and transitions to DONE', () => {
+    const { topic } = newPlan(`${TEST_TOPIC_PREFIX}impl-review-d`);
+    createdTopics.push(topic);
+    saveInstruction(topic, '# Instruction');
+    savePlan(topic, '# Plan');
+    saveReview(topic, 'Status: DESIGN_APPROVED');
+    startImplementation(topic);
+    saveImpl(topic, '# Implementation Report');
+
+    const result = saveImplReview(topic, 'Status: DONE\n\nShip it!');
+    expect(result.success).toBe(true);
+    expect(result.status).toBe('DONE');
+  });
+
+  it('extracts NEEDS_CHANGES status and transitions to IMPLEMENTING', () => {
+    const { topic } = newPlan(`${TEST_TOPIC_PREFIX}impl-review-nc`);
+    createdTopics.push(topic);
+    saveInstruction(topic, '# Instruction');
+    savePlan(topic, '# Plan');
+    saveReview(topic, 'Status: DESIGN_APPROVED');
+    startImplementation(topic);
+    saveImpl(topic, '# Implementation Report');
+
+    const result = saveImplReview(topic, 'Status: NEEDS_CHANGES\n\nFix bugs.');
+    expect(result.success).toBe(true);
+    expect(result.status).toBe('IMPLEMENTING');
+  });
+
+  it('fails when impl.md not found', () => {
+    const { topic } = newPlan(`${TEST_TOPIC_PREFIX}impl-review-fail`);
+    createdTopics.push(topic);
+    saveInstruction(topic, '# Instruction');
+    savePlan(topic, '# Plan');
+    saveReview(topic, 'Status: DESIGN_APPROVED');
+    startImplementation(topic);
+    // Don't save impl
+
+    const result = saveImplReview(topic, 'Status: DONE');
+    expect(result.success).toBe(false);
+    expect(result.message).toBe('impl.md not found');
+  });
+
+  it('fails when status extraction fails', () => {
+    const { topic } = newPlan(`${TEST_TOPIC_PREFIX}impl-review-sf`);
+    createdTopics.push(topic);
+    saveInstruction(topic, '# Instruction');
+    savePlan(topic, '# Plan');
+    saveReview(topic, 'Status: DESIGN_APPROVED');
+    startImplementation(topic);
+    saveImpl(topic, '# Implementation Report');
+
+    const result = saveImplReview(topic, 'No status line');
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Status extraction failed');
+  });
+});
+
+describe('full workflow e2e', () => {
+  let createdTopics: string[] = [];
+
+  beforeEach(() => {
+    createdTopics = [];
+    const plansDir = getPlansDir();
+    mkdirSync(plansDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    for (const topic of createdTopics) {
+      removeTopic(topic);
+    }
+  });
+
+  it('completes full workflow from new to DONE', () => {
+    // Step 1: new
+    const { topic } = newPlan(`${TEST_TOPIC_PREFIX}e2e`);
+    createdTopics.push(topic);
+
+    // Step 2: instruction
+    saveInstruction(topic, '# Instruction');
+    let meta = readMeta(topic);
+    expect(meta.success && meta.meta.status).toBe('NEEDS_PLAN');
+
+    // Step 3: plan
+    savePlan(topic, '# Plan');
+    meta = readMeta(topic);
+    expect(meta.success && meta.meta.status).toBe('NEEDS_DESIGN_REVIEW');
+
+    // Step 4: review (DESIGN_APPROVED)
+    saveReview(topic, 'Status: DESIGN_APPROVED');
+    meta = readMeta(topic);
+    expect(meta.success && meta.meta.status).toBe('DESIGN_APPROVED');
+
+    // Step 5: start
+    startImplementation(topic);
+    meta = readMeta(topic);
+    expect(meta.success && meta.meta.status).toBe('IMPLEMENTING');
+
+    // Step 6: impl
+    saveImpl(topic, '# Implementation Report');
+    meta = readMeta(topic);
+    expect(meta.success && meta.meta.status).toBe('NEEDS_IMPL_REVIEW');
+
+    // Step 7: impl-review (DONE)
+    saveImplReview(topic, 'Status: DONE');
+    meta = readMeta(topic);
+    expect(meta.success && meta.meta.status).toBe('DONE');
   });
 });
