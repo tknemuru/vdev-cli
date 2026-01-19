@@ -11,6 +11,7 @@ import { listPlans } from './commands/ls';
 import { startImplementation } from './commands/start';
 import { saveImpl } from './commands/impl';
 import { saveImplReview } from './commands/impl-review';
+import { syncCommand } from './commands/sync';
 
 const repoName = getRepoName();
 
@@ -46,10 +47,20 @@ program
 program
   .command('new <name>')
   .description('Create a new plan topic')
-  .action((name: string) => {
-    const result = newPlan(name);
+  .option('--force', 'Force sync CLAUDE.md even if differs')
+  .action((name: string, options: { force?: boolean }) => {
+    const result = newPlan(name, options.force ?? false);
     if (result.success) {
       output(`CREATED\t${result.topic}\t${result.path}`);
+      if (result.syncResult && !result.syncResult.success) {
+        if (result.syncResult.globalMissing) {
+          error('Global CLAUDE.md not found (~/.vdev/CLAUDE.md)');
+        } else if (result.syncResult.hasDiff) {
+          error('CLAUDE.md differs from global rules (source=~/.vdev/CLAUDE.md)');
+          console.error("Hint: run 'vdev sync --force' to overwrite repo CLAUDE.md");
+        }
+        process.exit(1);
+      }
     } else {
       error(result.message);
       process.exit(1);
@@ -171,6 +182,27 @@ program
     const result = gateCommand(topic);
     output(`${result.status}\t${topic}\t${result.message}`);
     process.exit(result.exitCode);
+  });
+
+program
+  .command('sync')
+  .description('Sync CLAUDE.md from global source')
+  .option('--force', 'Force overwrite even if differs')
+  .action((options: { force?: boolean }) => {
+    const result = syncCommand(options.force ?? false);
+    if (result.success) {
+      output(`SYNCED\t${result.message}`);
+    } else {
+      if (result.syncResult.globalMissing) {
+        error('Global CLAUDE.md not found (~/.vdev/CLAUDE.md)');
+      } else if (result.syncResult.hasDiff) {
+        error('CLAUDE.md differs from global rules (source=~/.vdev/CLAUDE.md)');
+        console.error("Hint: run 'vdev sync --force' to overwrite repo CLAUDE.md");
+      } else {
+        error(result.message);
+      }
+      process.exit(1);
+    }
   });
 
 program

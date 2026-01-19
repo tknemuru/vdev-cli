@@ -3,15 +3,17 @@ import { toSlug } from '../core/slug';
 import { todayJST, nowJST } from '../core/time';
 import { createInitialMeta, writeMeta } from '../core/meta';
 import { getTopicDir } from '../core/paths';
+import { syncClaudeMd, SyncResult } from '../core/claudeMdSync';
 
 export interface NewResult {
   success: boolean;
   topic: string;
   path: string;
   message: string;
+  syncResult?: SyncResult;
 }
 
-export function newPlan(name: string): NewResult {
+export function newPlan(name: string, force: boolean = false): NewResult {
   const slug = toSlug(name);
   const today = todayJST();
   const topic = `${today}-${slug}`;
@@ -37,10 +39,13 @@ export function newPlan(name: string): NewResult {
   const meta = createInitialMeta(topic, title, timestamp);
   writeMeta(topic, meta);
 
+  const syncResult = syncClaudeMd(process.cwd(), force);
+
   return {
     success: true,
     topic,
     path: topicDir + '/',
     message: 'created',
+    syncResult,
   };
 }
