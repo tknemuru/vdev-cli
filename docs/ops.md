@@ -5,7 +5,10 @@
 ### Step 1: Create Topic
 
 vdev new auth-refresh
+
+```bash
 # REPO=my-project	CREATED	2026-01-19-auth-refresh	docs/plans/2026-01-19-auth-refresh/
+```
 
 ---
 
@@ -18,30 +21,51 @@ cat << 'EOF' | vdev instruction 2026-01-19-auth-refresh --stdin
 - リフレッシュトークンの自動更新
 - 有効期限切れ時のリダイレクト
 EOF
+
+```bash
 # REPO=my-project	INSTRUCTION_SAVED	2026-01-19-auth-refresh
+```
 
 ---
 
 ### Step 3: Gate Check（NEEDS_PLAN 確認）
 
 vdev gate 2026-01-19-auth-refresh
+
+```bash
 # REPO=my-project	NEEDS_PLAN	2026-01-19-auth-refresh	plan.md not found
 # Exit code: 11
+```
 
 ---
 
 ### Step 4: Create Plan（Claude が生成 → vdev plan で登録）
 
 cat plan-output.md | vdev plan 2026-01-19-auth-refresh --stdin
+
+```bash
 # REPO=my-project	PLAN_SAVED	2026-01-19-auth-refresh
+```
+
+#### Plan 作成結果の取り込み（WSL + Windows 環境）
+
+Claude が生成した plan（例: `plan-output.md`）は、以下のコマンドで **クリップボードへのコピー**と  
+**`vdev plan` への流し込み**を同時に行うことを推奨する。
+
+```bash
+cat plan-output.md | tee >(clip.exe) | vdev plan <TOPIC> --stdin
+```
 
 ---
 
 ### Step 5: Gate Check（NEEDS_DESIGN_REVIEW 確認）
 
 vdev gate 2026-01-19-auth-refresh
+
+```bash
 # REPO=my-project	NEEDS_DESIGN_REVIEW	2026-01-19-auth-refresh	design-review.md not found
 # Exit code: 12
+```
 
 ---
 
@@ -62,23 +86,32 @@ Verify:
 Rollback:
 - 切り戻し方針（1行）
 EOF
+
+```bash
 # REPO=my-project	DESIGN_REVIEW_SAVED	2026-01-19-auth-refresh	DESIGN_APPROVED
+```
 
 ---
 
 ### Step 7: Gate Check（DESIGN_APPROVED 確認）
 
 vdev gate 2026-01-19-auth-refresh
+
+```bash
 # REPO=my-project	DESIGN_APPROVED	2026-01-19-auth-refresh	ready to implement
 # Exit code: 13
+```
 
 ---
 
 ### Step 8: Start Implementation（実装開始宣言）
 
 vdev start 2026-01-19-auth-refresh
+
+```bash
 # REPO=my-project	IMPLEMENTING	2026-01-19-auth-refresh
 # Exit code: 0
+```
 
 ---
 
@@ -92,7 +125,10 @@ vdev start 2026-01-19-auth-refresh
 ### Step 10: Implementation Report（Claude が実装完了報告 → vdev impl で登録）
 
 cat impl-output.md | vdev impl 2026-01-19-auth-refresh --stdin
+
+```bash
 # REPO=my-project	IMPL_SAVED	2026-01-19-auth-refresh
+```
 
 推奨フォーマット（impl.md 内）：
 [Summary]
@@ -121,15 +157,21 @@ Verify:
 Rollback:
 - 切り戻し方針（1行）
 EOF
+
+```bash
 # REPO=my-project	IMPL_REVIEW_SAVED	2026-01-19-auth-refresh	DONE
+```
 
 ---
 
 ### Step 12: Final Gate Check（DONE 確認）
 
 vdev gate 2026-01-19-auth-refresh
+
+```bash
 # REPO=my-project	DONE	2026-01-19-auth-refresh	done
 # Exit code: 0
+```
 
 ---
 
