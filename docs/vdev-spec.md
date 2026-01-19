@@ -432,3 +432,31 @@ ERROR: <message>
 - LLM API 呼び出しの内包
 - 会話ログの保存
 - Git 操作の自動実行
+
+---
+
+## 14. CLAUDE.md 管理方針（永続）
+
+vdev は LLM 実行時の共通指示文として CLAUDE.md を利用する。
+
+### 14.1 Source of Truth
+
+- CLAUDE.md の唯一の正（Source of Truth）は以下とする：
+
+  ~/.vdev/CLAUDE.md
+
+- このファイルは vdev フロー全体に共通な方針のみを記載し、
+  リポジトリ固有のルールは含めない。
+
+### 14.2 配布・同期方針
+
+- 各リポジトリのルートに配置される CLAUDE.md は、
+  上記 Source of Truth の **同期コピー** として扱う。
+- vdev は CLAUDE.md の内容解釈や編集を行わない。
+
+### 14.3 設計原則
+
+- CLAUDE.md は「コピーソース方式」を避けるため、
+  単一正本を中心とした運用を前提とする。
+- vdev-spec.md / ops.md の更新により CLAUDE.md の内容が変わることはあるが、
+  各リポジトリ固有の判断で改変してはならない。
