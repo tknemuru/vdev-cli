@@ -1,232 +1,175 @@
-# vdev Operations Guide
+# vdev Operations Guide（v2.0）
 
-## 1. Daily Workflow（公式フロー）
+## 1. Daily Workflow（公式フロー：DONE まで）
 
 ### Step 1: Create Topic
 
-```bash
 vdev new auth-refresh
 # REPO=my-project	CREATED	2026-01-19-auth-refresh	docs/plans/2026-01-19-auth-refresh/
-```
+
+---
 
 ### Step 2: Write Instruction
 
-```bash
 cat << 'EOF' | vdev instruction 2026-01-19-auth-refresh --stdin
 # 認証トークンのリフレッシュ機能
 
-## 要件
+要件：
 - リフレッシュトークンの自動更新
 - 有効期限切れ時のリダイレクト
 EOF
 # REPO=my-project	INSTRUCTION_SAVED	2026-01-19-auth-refresh
-```
+
+---
 
 ### Step 3: Gate Check（NEEDS_PLAN 確認）
 
-```bash
 vdev gate 2026-01-19-auth-refresh
 # REPO=my-project	NEEDS_PLAN	2026-01-19-auth-refresh	plan.md not found
 # Exit code: 11
-```
 
-### Step 4: Create Plan
+---
 
-```bash
-# Claude Code が plan を生成
+### Step 4: Create Plan（Claude が生成 → vdev plan で登録）
+
 cat plan-output.md | vdev plan 2026-01-19-auth-refresh --stdin
 # REPO=my-project	PLAN_SAVED	2026-01-19-auth-refresh
-```
 
-### Step 5: Gate Check（NEEDS_REVIEW 確認）
+---
 
-```bash
+### Step 5: Gate Check（NEEDS_DESIGN_REVIEW 確認）
+
 vdev gate 2026-01-19-auth-refresh
-# REPO=my-project	NEEDS_REVIEW	2026-01-19-auth-refresh	review.md not found
+# REPO=my-project	NEEDS_DESIGN_REVIEW	2026-01-19-auth-refresh	design-review.md not found
 # Exit code: 12
-```
 
-### Step 6: Review
+---
 
-```bash
-# レビュー結果を保存
-cat << 'EOF' | vdev review 2026-01-19-auth-refresh --stdin
-Status: APPROVED
+### Step 6: Design Review（人間/ChatGPT）
 
-計画内容を確認し、承認します。
+cat << 'EOF' | vdev design-review 2026-01-19-auth-refresh --stdin
+Status: DESIGN_APPROVED
+
+Summary:
+- 要約（1〜3行）
+
+Requests:
+- 修正要求（必要な場合のみ）
+
+Verify:
+- 確認方法（コマンドまたは手順）
+
+Rollback:
+- 切り戻し方針（1行）
 EOF
-# REPO=my-project	REVIEW_SAVED	2026-01-19-auth-refresh	APPROVED
-```
-
-### Step 7: Final Gate Check
-
-```bash
-vdev gate 2026-01-19-auth-refresh
-# REPO=my-project	APPROVED	2026-01-19-auth-refresh	ready to implement
-# Exit code: 0
-```
-
-### Step 8: Implementation
-
-```bash
-vdev run 2026-01-19-auth-refresh
-# REPO=my-project	RUN_ALLOWED	2026-01-19-auth-refresh
-# Exit code: 0
-
-# → 実装開始
-```
+# REPO=my-project	DESIGN_REVIEW_SAVED	2026-01-19-auth-refresh	DESIGN_APPROVED
 
 ---
 
-## 2. Status Patterns
+### Step 7: Gate Check（DESIGN_APPROVED 確認）
 
-| Status | Exit Code | 説明 | 次のアクション |
-|--------|-----------|------|---------------|
-| NEEDS_INSTRUCTION | 10 | instruction.md 未作成 | `vdev instruction` |
-| NEEDS_PLAN | 11 | plan.md 未作成 | `vdev plan` |
-| NEEDS_REVIEW | 12 | review.md 未作成 | `vdev review` |
-| NEEDS_CHANGES | 13 | 修正要求 / Status 抽出失敗 | plan 修正後に再レビュー |
-| REJECTED | 14 | 方針却下 | 計画の見直し |
-| APPROVED | 0 | 実装 GO | `vdev run` で実装開始 |
-| BROKEN_STATE | 20 | 整合性エラー | rollback.md 参照 |
-
----
-
-## 3. Listing Topics
-
-```bash
-# 全トピック表示（updatedAt 降順）
-vdev ls
-# REPO=my-project	2026-01-19-auth-refresh	APPROVED	Auth Refresh	2026-01-19T10:30:00+09:00
-# REPO=my-project	2026-01-19-bugfix	NEEDS_REVIEW	Bug Fix	2026-01-19T09:00:00+09:00
-```
-
----
-
-## 4. Plan 更新時のフロー
-
-plan を更新すると**承認は自動的に無効化**される。
-
-```bash
-# 既存の APPROVED 状態
 vdev gate 2026-01-19-auth-refresh
-# Exit code: 0 (APPROVED)
-
-# plan を更新
-cat new-plan.md | vdev plan 2026-01-19-auth-refresh --stdin
-# REPO=my-project	PLAN_SAVED	2026-01-19-auth-refresh
-
-# 承認が無効化された
-vdev gate 2026-01-19-auth-refresh
-# REPO=my-project	NEEDS_CHANGES	2026-01-19-auth-refresh	changes requested
+# REPO=my-project	DESIGN_APPROVED	2026-01-19-auth-refresh	ready to implement
 # Exit code: 13
 
-# 再レビューが必要
-cat << 'EOF' | vdev review 2026-01-19-auth-refresh --stdin
-Status: APPROVED
+---
 
-修正内容を確認し、再承認します。
+### Step 8: Start Implementation（実装開始宣言）
+
+vdev start 2026-01-19-auth-refresh
+# REPO=my-project	IMPLEMENTING	2026-01-19-auth-refresh
+# Exit code: 0
+
+---
+
+### Step 9: Implementation（Claude Code が実装）
+
+- Claude Code に実装を実行させる
+- 実装が完了したら Step 10 で実装完了報告を登録する
+
+---
+
+### Step 10: Implementation Report（Claude が実装完了報告 → vdev impl で登録）
+
+cat impl-output.md | vdev impl 2026-01-19-auth-refresh --stdin
+# REPO=my-project	IMPL_SAVED	2026-01-19-auth-refresh
+
+推奨フォーマット（impl.md 内）：
+[Summary]
+[Files Changed]
+[Tests]
+[Verify]
+[Docs]
+[Risks]
+
+---
+
+### Step 11: Implementation Review（人間/ChatGPT）
+
+cat << 'EOF' | vdev impl-review 2026-01-19-auth-refresh --stdin
+Status: DONE
+
+Summary:
+- 要約（1〜3行）
+
+Requests:
+- 修正要求（必要な場合のみ）
+
+Verify:
+- 確認方法（コマンドまたは手順）
+
+Rollback:
+- 切り戻し方針（1行）
 EOF
-```
+# REPO=my-project	IMPL_REVIEW_SAVED	2026-01-19-auth-refresh	DONE
 
 ---
 
-## 5. stdin 処理の詳細
+### Step 12: Final Gate Check（DONE 確認）
 
-### LF 正規化
-
-全ての stdin 入力は保存時に CRLF → LF に変換される。
-
-```bash
-# Windows からのコピペでも正規化される
-printf "line1\r\nline2\r\n" | vdev plan topic --stdin
-# 保存時: "line1\nline2\n"
-```
-
-### ハッシュ計算
-
-正規化後のコンテンツで SHA256 ハッシュが計算される。
-
-### updatedAt 更新
-
-instruction/plan/review 保存時に `meta.timestamps.updatedAt` が JST で更新される。
+vdev gate 2026-01-19-auth-refresh
+# REPO=my-project	DONE	2026-01-19-auth-refresh	done
+# Exit code: 0
 
 ---
 
-## 6. Warnings and Errors
+## 2. Review Loop（差戻しの往復）
 
-### Status 抽出失敗
+### 2.1 設計差戻し（NEEDS_CHANGES）
 
-```bash
-echo "レビュー完了" | vdev review topic --stdin
-# REPO=my-project	REVIEW_SAVED	topic	NEEDS_CHANGES
-
-# Status: 行がないため NEEDS_CHANGES に強制される
-```
-
-**正しい形式:**
-```
-Status: APPROVED
-Status: REJECTED
-Status: NEEDS_CHANGES
-```
-
-### BROKEN_STATE
-
-```bash
-vdev gate topic
-# REPO=my-project	BROKEN_STATE	topic	hash mismatch in APPROVED/REJECTED state
-# Exit code: 20
-```
-
-**原因:**
-- meta.json の手動編集
-- plan.md / review.md の手動編集
-- ファイルの削除
-
-**対処:** `docs/rollback.md` 参照
+- design-review に `Status: NEEDS_CHANGES` を書く
+- vdev は status を NEEDS_PLAN に戻す（設計のやり直し）
+- Claude Code が plan を修正し、vdev plan で再登録
+- 再度 design-review を行う
 
 ---
 
-## 7. スクリプトでの利用
+### 2.2 実装差戻し（NEEDS_CHANGES）
 
-```bash
-#!/bin/bash
-TOPIC="2026-01-19-auth-refresh"
-
-# gate チェック
-if vdev gate "$TOPIC" > /dev/null 2>&1; then
-    echo "Implementation allowed"
-    # 実装処理
-else
-    exit_code=$?
-    case $exit_code in
-        10) echo "Need instruction" ;;
-        11) echo "Need plan" ;;
-        12) echo "Need review" ;;
-        13) echo "Changes requested" ;;
-        14) echo "Rejected" ;;
-        20) echo "Broken state - check meta.json" ;;
-    esac
-    exit $exit_code
-fi
-```
+- impl-review に `Status: NEEDS_CHANGES` を書く
+- vdev は status を IMPLEMENTING に戻す（実装修正）
+- Claude Code が修正し、vdev impl で再登録
+- 再度 impl-review を行う
 
 ---
 
-## 8. Best Practices
+## 3. Warnings and Errors
 
-1. **plan.md は vdev コマンド経由でのみ更新する**
-   - 手動編集は BROKEN_STATE の原因になる
+### 3.1 Status 抽出失敗
 
-2. **review.md には必ず Status: 行を含める**
-   - 省略すると NEEDS_CHANGES になる
+Status 行が規定フォーマットに一致しない場合、コマンドは COMMAND_ERROR(1) とする。
+（状態遷移は行わない）
 
-3. **状態確認は vdev gate を使う**
-   - meta.json を直接読まない
+### 3.2 前提条件違反
 
-4. **Git コミットは gate 通過後に行う**
-   - APPROVED 状態でコミットすることで履歴を明確に
+plan/design-review/start/impl/impl-review は前提条件を満たさない場合に COMMAND_ERROR(1) とする。
+（状態遷移は行わない）
 
-5. **instruction.md は計画の背景を記録する**
-   - gate 条件には含まれないが、文脈の保存に有用
+---
+
+## 4. Best Practices
+
+1. docs/plans/<topic>/ 配下を手動編集しない（BROKEN_STATE の原因になる）
+2. gate は必ず次の行動を決めるために使う
+3. DONE の達成感は vdev ls と vdev gate（Exit 0）で視覚化する
+4. Verify は「具体コマンド＋成功条件」を必ず記録する
