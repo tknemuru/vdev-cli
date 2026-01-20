@@ -41,7 +41,7 @@ vdev gate 2026-01-19-auth-refresh
 
 ### Step 4: Create Plan（Claude が生成 → vdev plan で登録）
 
-cat plan-output.md | vdev plan 2026-01-19-auth-refresh --stdin
+cat plan.md | vdev plan 2026-01-19-auth-refresh --stdin
 
 ```bash
 # REPO=my-project	PLAN_SAVED	2026-01-19-auth-refresh
@@ -49,11 +49,13 @@ cat plan-output.md | vdev plan 2026-01-19-auth-refresh --stdin
 
 #### Plan 作成結果の取り込み（WSL + Windows 環境）
 
-Claude が生成した plan（例: `plan-output.md`）は、以下のコマンドで **クリップボードへのコピー**と  
+Claude が生成した plan（例: `plan.md`）は、以下のコマンドで **クリップボードへのコピー**と  
 **`vdev plan` への流し込み**を同時に行うことを推奨する。
 
 ```bash
-cat plan-output.md | tee >(clip.exe) | vdev plan <TOPIC> --stdin
+cat plan.md | vdev plan <TOPIC> --stdin
+cat plan.md | iconv -f UTF-8 -t UTF-16LE | /mnt/c/Windows/System32/clip.exe
+
 ```
 
 ---
@@ -124,7 +126,7 @@ vdev start 2026-01-19-auth-refresh
 
 ### Step 10: Implementation Report（Claude が実装完了報告 → vdev impl で登録）
 
-cat impl-output.md | vdev impl 2026-01-19-auth-refresh --stdin
+cat impl.md | vdev impl 2026-01-19-auth-refresh --stdin
 
 ```bash
 # REPO=my-project	IMPL_SAVED	2026-01-19-auth-refresh
