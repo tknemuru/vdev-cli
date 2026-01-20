@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "topic": "2026-01-20-sync-claude-md",
+  "title": "Sync Claude Md",
+  "status": "DONE",
+  "paths": {
+    "instruction": "instruction.md",
+    "plan": "plan.md",
+    "designReview": "design-review.md",
+    "impl": "impl.md",
+    "implReview": "impl-review.md"
+  },
+  "hashes": {
+    "planSha256": "3bed2f50e11e643fbbde8382586cced213ff95af8d94a83cb6e79ef99e0d9446",
+    "designReviewSha256": "a91245218de24249782bd39bc3f15c4be8be21c0706096c88dc224efa98af6df",
+    "implSha256": "39a20842eebfd85a8ab51edba5fe02902a2cbc08c287744df90752ba877f3e68",
+    "implReviewSha256": "32256eea8348c74dc2f1b57eeaec5ff47f3392285f9ec8a7bff9733d36750ba6"
+  },
+  "timestamps": {
+    "createdAt": "2026-01-20T00:26:31+09:00",
+    "updatedAt": "2026-01-20T01:26:58+09:00"
+  }
+}
