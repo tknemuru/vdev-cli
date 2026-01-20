@@ -127,6 +127,7 @@ vdev start 2026-01-19-auth-refresh
 ### Step 10: Implementation Report（Claude が実装完了報告 → vdev impl で登録）
 
 cat impl.md | vdev impl 2026-01-19-auth-refresh --stdin
+cat impl.md | iconv -f UTF-8 -t UTF-16LE | /mnt/c/Windows/System32/clip.exe
 
 ```bash
 # REPO=my-project	IMPL_SAVED	2026-01-19-auth-refresh
