@@ -1,334 +1,322 @@
 # vdev Operations Guide（v2.0）
 
-## 1. Daily Workflow（公式フロー：DONE まで）
+## 1. はじめに
 
-### Step 1: Create Topic
+### 1.1 本ドキュメントの目的
 
-vdev new auth-refresh
+本ドキュメントは vdev-cli の運用ガイドである。
+状態（gate）別の許可操作、CLI 固有の注意点、同期・初期化コマンドの挙動を説明する。
+
+### 1.2 本ドキュメントが扱わないこと
+
+以下は本ドキュメントの対象外とする。別途定義されたフロー仕様を参照すること。
+
+- 実行主体・責務分担
+- レビューや承認の意思決定プロセス
+- 例外時の介入・履歴管理・統制ポリシー
+- マージ・リリース等の上位判断
+
+### 1.3 参照先
+
+- CLI 仕様: vdev-spec.md
+- フロー仕様: 別途定義されたフロー仕様を参照
+
+---
+
+## 2. 状態別操作リファレンス
+
+vdev gate の出力を確認し、現在の状態に応じた操作を行う。
 
 ```bash
-# REPO=my-project	CREATED	2026-01-19-auth-refresh	docs/plans/2026-01-19-auth-refresh/
+vdev gate <topic>
 ```
 
----
+### 2.1 NEEDS_INSTRUCTION（Exit Code: 10）
 
-### Step 2: Write Instruction
+**意味**: instruction.md が未登録
 
-cat << 'EOF' | vdev instruction 2026-01-19-auth-refresh --stdin
-# 認証トークンのリフレッシュ機能
-
-要件：
-- リフレッシュトークンの自動更新
-- 有効期限切れ時のリダイレクト
-EOF
-
+**許可コマンド**:
 ```bash
-# REPO=my-project	INSTRUCTION_SAVED	2026-01-19-auth-refresh
+echo "..." | vdev instruction <topic> --stdin
 ```
 
+**注意点**:
+- topic が存在しない場合は先に `vdev new` を実行する
+
 ---
 
-### Step 3: Gate Check（NEEDS_PLAN 確認）
+### 2.2 NEEDS_PLAN（Exit Code: 11）
 
-vdev gate 2026-01-19-auth-refresh
+**意味**: plan.md が未登録
 
+**許可コマンド**:
 ```bash
-# REPO=my-project	NEEDS_PLAN	2026-01-19-auth-refresh	plan.md not found
-# Exit code: 11
+cat plan.md | vdev plan <topic> --stdin
 ```
 
+**注意点**:
+- instruction.md が存在しない場合は COMMAND_ERROR(1)
+
 ---
 
-### Step 4: Create Plan（Claude が生成 → vdev plan で登録）
+### 2.3 NEEDS_DESIGN_REVIEW（Exit Code: 12）
 
-cat plan.md | vdev plan 2026-01-19-auth-refresh --stdin
+**意味**: design-review.md が未登録
 
+**許可コマンド**:
 ```bash
-# REPO=my-project	PLAN_SAVED	2026-01-19-auth-refresh
+cat design-review.md | vdev review <topic> --stdin
 ```
 
-#### Plan 作成結果の取り込み（WSL + Windows 環境）
+**Status 抽出パターン**: `^Status:\s*(DESIGN_APPROVED|REJECTED|NEEDS_CHANGES)\s*$`
 
-Claude が生成した plan（例: `plan.md`）は、以下のコマンドで **クリップボードへのコピー**と  
-**`vdev plan` への流し込み**を同時に行うことを推奨する。
+**注意点**:
+- plan.md が存在しない場合は COMMAND_ERROR(1)
+- Status 行が規定フォーマットに一致しない場合は COMMAND_ERROR(1)
 
+---
+
+### 2.4 DESIGN_APPROVED（Exit Code: 13）
+
+**意味**: 設計承認済み、実装開始可能
+
+**許可コマンド**:
 ```bash
-cat plan.md | vdev plan <TOPIC> --stdin
-cat plan.md | iconv -f UTF-8 -t UTF-16LE | /mnt/c/Windows/System32/clip.exe
-
+vdev start <topic>
 ```
 
+**注意点**:
+- start 実行前に実装を行わない
+- start 実行後、状態は IMPLEMENTING に遷移する
+
 ---
 
-### Step 5: Gate Check（NEEDS_DESIGN_REVIEW 確認）
+### 2.5 IMPLEMENTING（Exit Code: 14）
 
-vdev gate 2026-01-19-auth-refresh
+**意味**: 実装中
 
+**許可コマンド**:
 ```bash
-# REPO=my-project	NEEDS_DESIGN_REVIEW	2026-01-19-auth-refresh	design-review.md not found
-# Exit code: 12
+cat impl.md | vdev impl <topic> --stdin
 ```
 
+**注意点**:
+- status が IMPLEMENTING 以外の場合は COMMAND_ERROR(1)
+- impl.md 登録後、状態は NEEDS_IMPL_REVIEW に遷移する
+
 ---
 
-### Step 6: Design Review（人間/ChatGPT）
+### 2.6 NEEDS_IMPL_REPORT（Exit Code: 15）
 
-cat << 'EOF' | vdev review 2026-01-19-auth-refresh --stdin
-Status: DESIGN_APPROVED
+**意味**: impl.md が未登録（実装完了報告待ち）
 
-Summary:
-- 要約（1〜3行）
-
-Requests:
-- 修正要求（必要な場合のみ）
-
-Verify:
-- 確認方法（コマンドまたは手順）
-
-Rollback:
-- 切り戻し方針（1行）
-EOF
-
+**許可コマンド**:
 ```bash
-# REPO=my-project	DESIGN_REVIEW_SAVED	2026-01-19-auth-refresh	DESIGN_APPROVED
+cat impl.md | vdev impl <topic> --stdin
 ```
 
+**注意点**:
+- 状態 IMPLEMENTING において impl.md が未登録の場合に gate がこの状態を返す
+
 ---
 
-### Step 7: Gate Check（DESIGN_APPROVED 確認）
+### 2.7 NEEDS_IMPL_REVIEW（Exit Code: 16）
 
-vdev gate 2026-01-19-auth-refresh
+**意味**: impl-review.md が未登録
 
+**許可コマンド**:
 ```bash
-# REPO=my-project	DESIGN_APPROVED	2026-01-19-auth-refresh	ready to implement
-# Exit code: 13
+cat impl-review.md | vdev impl-review <topic> --stdin
 ```
 
+**Status 抽出パターン**: `^Status:\s*(DONE|NEEDS_CHANGES)\s*$`
+
+**注意点**:
+- impl.md が存在しない場合は COMMAND_ERROR(1)
+- Status 行が規定フォーマットに一致しない場合は COMMAND_ERROR(1)
+
 ---
 
-### Step 8: Start Implementation（実装開始宣言）
+### 2.8 DONE（Exit Code: 0）
 
-vdev start 2026-01-19-auth-refresh
+**意味**: 完了
+
+**許可コマンド**: なし（読み取り専用）
+
+**注意点**:
+- 全ファイルのハッシュ整合が必須
+- ハッシュ不整合がある場合は BROKEN_STATE
+
+---
+
+### 2.9 REJECTED（Exit Code: 17）
+
+**意味**: 設計却下
+
+**許可コマンド**: なし
+
+**対応方法**:
+- topic を破棄するか、新規 topic を作成する
+
+---
+
+### 2.10 BROKEN_STATE（Exit Code: 20）
+
+**意味**: 整合性エラー
+
+**許可コマンド**: なし
+
+**代表的な原因**:
+- meta.json の手動編集
+- ファイルの直接編集によるハッシュ不整合
+- meta.json のパース失敗
+
+**対応方法**:
+- CLI による修復コマンドは提供されない
+- topic を破棄し、新規作成を推奨
+
+---
+
+## 3. 差戻し時の挙動
+
+### 3.1 設計差戻し（NEEDS_CHANGES）
+
+design-review に `Status: NEEDS_CHANGES` が記載された場合:
+
+1. status は NEEDS_PLAN に戻る
+2. plan.md を修正し、`vdev plan` で再登録
+3. `vdev review` で再レビュー
+
+### 3.2 実装差戻し（NEEDS_CHANGES）
+
+impl-review に `Status: NEEDS_CHANGES` が記載された場合:
+
+1. status は IMPLEMENTING に戻る
+2. 実装を修正し、`vdev impl` で再登録
+3. `vdev impl-review` で再レビュー
+
+### 3.3 CLI が保証しない範囲
+
+- 差戻し回数の管理
+- レビュー履歴の追跡
+
+---
+
+## 4. CLI 運用上の注意点
+
+### 4.1 手動編集禁止
+
+以下のファイル・ディレクトリを直接編集しない:
+
+- `docs/plans/<topic>/` 配下のファイル
+- `meta.json`
+
+手動編集は BROKEN_STATE の原因となる。
+
+### 4.2 stdin と改行コード
+
+- 全 stdin 入力は保存時に CRLF → LF に変換される
+- --stdin フラグは必須
+
+### 4.3 gate による行動判断
+
+`vdev gate` は次の行動を決めるために使用する。
+gate の出力と exit code を確認し、状態に応じた操作を行う。
+
+---
+
+## 5. 同期・初期化コマンド
+
+### 5.1 vdev new
+
+新しい topic を作成する。
 
 ```bash
-# REPO=my-project	IMPLEMENTING	2026-01-19-auth-refresh
-# Exit code: 0
+vdev new <name> [--force]
 ```
 
----
+**動作**:
+1. `<name>` を slug 化し、日付プレフィックスを付与
+2. `docs/plans/<topic>/` ディレクトリを作成
+3. meta.json を初期状態（NEEDS_INSTRUCTION）で作成
+4. グローバル正本（~/.vdev/CLAUDE.md）から同期を試行
 
-### Step 9: Implementation（Claude Code が実装）
+**--force の効果**:
+- 差分があっても上書きする（topic 作成は常に実行）
 
-- Claude Code に実装を実行させる
-- 実装が完了したら Step 10 で実装完了報告を登録する
+**slug 正規化ルール**:
+- 大文字 → 小文字
+- 特殊文字・スペース → ハイフン
+- 連続ハイフン → 単一ハイフン
+- 先頭・末尾のハイフン → 削除
+- 最大長: 48 文字
+- 空文字列 → `untitled`
 
----
+### 5.2 vdev sync
 
-### Step 10: Implementation Report（Claude が実装完了報告 → vdev impl で登録）
-
-cat impl.md | vdev impl 2026-01-19-auth-refresh --stdin
-cat impl.md | iconv -f UTF-8 -t UTF-16LE | /mnt/c/Windows/System32/clip.exe
+CLAUDE.md をグローバル正本に同期する。
 
 ```bash
-# REPO=my-project	IMPL_SAVED	2026-01-19-auth-refresh
+vdev sync [--force]
 ```
 
-推奨フォーマット（impl.md 内）：
-[Summary]
-[Files Changed]
-[Tests]
-[Verify]
-[Docs]
-[Risks]
+**デフォルト動作**（--force なし）:
+- 差分があれば stderr にエラーを出力し exit 1
+- 上書きは行わない
 
----
+**--force 指定時**:
+- 差分があっても常に上書き
+- exit 0
 
-### Step 11: Implementation Review（人間/ChatGPT）
+**差分判定**:
+- Last synced 行は比較対象から除外
 
-cat << 'EOF' | vdev impl-review 2026-01-19-auth-refresh --stdin
-Status: DONE
+### 5.3 vdev-flow.md のセットアップ
 
-Summary:
-- 要約（1〜3行）
-
-Requests:
-- 修正要求（必要な場合のみ）
-
-Verify:
-- 確認方法（コマンドまたは手順）
-
-Rollback:
-- 切り戻し方針（1行）
-EOF
+vdev-flow.md を配布するには、正本への symlink を作成する:
 
 ```bash
-# REPO=my-project	IMPL_REVIEW_SAVED	2026-01-19-auth-refresh	DONE
-```
-
----
-
-### Step 12: Final Gate Check（DONE 確認）
-
-vdev gate 2026-01-19-auth-refresh
-
-```bash
-# REPO=my-project	DONE	2026-01-19-auth-refresh	done
-# Exit code: 0
-```
-
----
-
-## 2. Review Loop（差戻しの往復）
-
-### 2.1 設計差戻し（NEEDS_CHANGES）
-
-- design-review に `Status: NEEDS_CHANGES` を書く
-- vdev は status を NEEDS_PLAN に戻す（設計のやり直し）
-- Claude Code が plan を修正し、vdev plan で再登録
-- 再度 design-review を行う
-
----
-
-### 2.2 実装差戻し（NEEDS_CHANGES）
-
-- impl-review に `Status: NEEDS_CHANGES` を書く
-- vdev は status を IMPLEMENTING に戻す（実装修正）
-- Claude Code が修正し、vdev impl で再登録
-- 再度 impl-review を行う
-
----
-
-## 3. Warnings and Errors
-
-### 3.1 Status 抽出失敗
-
-Status 行が規定フォーマットに一致しない場合、コマンドは COMMAND_ERROR(1) とする。
-（状態遷移は行わない）
-
-### 3.2 前提条件違反
-
-plan/review/start/impl/impl-review は前提条件を満たさない場合に COMMAND_ERROR(1) とする。
-（状態遷移は行わない）
-
----
-
-## 4. Best Practices
-
-1. docs/plans/<topic>/ 配下を手動編集しない（BROKEN_STATE の原因になる）
-2. gate は必ず次の行動を決めるために使う
-3. DONE の達成感は vdev ls と vdev gate（Exit 0）で視覚化する
-4. Verify は「具体コマンド＋成功条件」を必ず記録する
-
----
-
-## 5. CLAUDE.md / vdev-flow.md 運用ルール
-
-### 正本の扱い
-
-- vdev フローで使用する CLAUDE.md および vdev-flow.md の正本は以下に配置する：
-
-  ~/.vdev/CLAUDE.md
-  ~/.vdev/vdev-flow.md
-
-- これらのファイルは vdev フロー全体に共通な方針のみを記載する。
-- vdev-flow.md は vdev フローの SoT（Single Source of Truth）である。
-
-### リポジトリ側の扱い
-
-- 各リポジトリの CLAUDE.md は正本から同期された内容であることを前提とする。
-- リポジトリ内で直接編集してはならない。
-
-### 運用上の意図
-
-- vdev フローの変更時に複数リポジトリを手動修正する事態を避けるため、
-  CLAUDE.md は単一正本運用とする。
-
-### 同期コマンド
-
-```bash
-# 差分確認（同期しない）
-vdev sync
-
-# 強制同期
-vdev sync --force
-```
-
-### vdev-flow.md のセットアップ
-
-vdev-flow.md を配布するには、正本への symlink を作成する必要がある：
-
-```bash
-# ai-resources リポジトリの vdev-flow.md を正本として symlink 作成
 ln -s /path/to/ai-resources/vibe-coding-partner/knowledges/vdev-flow.md ~/.vdev/vdev-flow.md
 ```
 
-- vdev-flow.md の symlink が存在しない場合、`vdev sync` / `vdev new` は警告を出力するが、
-  コマンド自体は成功する（互換維持）。
-- vdev-flow.md を配布したい場合は上記の symlink を作成してから `vdev sync --force` を実行する。
+symlink が存在しない場合、`vdev sync` / `vdev new` は警告を出力するが、コマンド自体は成功する。
 
-### vdev new 実行時の同期
+### 5.4 .claude 資産（commands / subagents）の同期
 
-- vdev new は内部で sync 相当を実行する
-- 差分がある場合（--force なし）:
-  - topic は作成される
-  - 同期のみ失敗し exit=1
-  - stderr に `vdev sync --force` の案内を出力
-- --force は同期のみに作用（topic 作成の意味は変えない）
-- グローバル正本（~/.vdev/CLAUDE.md）が存在しない場合:
-  - topic は作成される
-  - 同期は失敗し exit=1
-
-### .claude 資産（commands / subagents）の運用
-
-#### 配布元の構成
-
+**配布元の構成**:
 ```
 ~/.vdev/.claude/
 ├── commands/
-│   ├── command1.md
-│   └── command2.md
+│   └── *.md
 └── subagents/
-    ├── subagent1.md
-    └── subagent2.md
+    └── *.md
 ```
 
-- これらのディレクトリは ai-resources からコピーするか、直接作成する。
-- symlink ではなく実体ディレクトリとして配置することを推奨。
+**同期ポリシー**:
+- 差分なし: 何もしない
+- 差分あり + --force なし: 警告のみ（上書きしない）
+- 差分あり + --force あり: 上書き
+- 同期先が存在しない: 新規作成（--force 不要）
 
-#### 同期動作
+**注意点**:
+- 同期元が存在しない場合は警告のみ（exit code には影響しない）
+- .claude 資産の同期失敗は exit code に影響しない
 
-- `vdev sync` / `vdev new` は ~/.vdev/.claude/ 配下を各リポジトリにコピーする。
-- 同期ポリシーは CLAUDE.md / vdev-flow.md と同様:
-  - 差分なし: 何もしない（up to date）
-  - 差分あり + --force なし: 警告のみ（上書きしない）
-  - 差分あり + --force あり: 上書きコピー
-  - 同期先が存在しない: 新規作成（--force 不要）
-- 同期元が存在しない場合は警告のみ（exit code には影響しない）。
-- .claude 資産の同期失敗は exit code に影響しない（CLAUDE.md の同期結果のみで判定）。
+---
 
-#### 警告メッセージ
+## 6. vdev ls
 
-同期元欠損時:
-```
-Warning: ~/.vdev/.claude/commands not found (skipped)
-Warning: ~/.vdev/.claude/subagents not found (skipped)
-```
-
-差分検出時（--force なし）:
-```
-Warning: .claude/commands differs from source (~/.vdev/.claude/commands)
-Hint: run 'vdev sync --force' to overwrite repo .claude/commands
-```
-
-#### セットアップ
+全 topic をリスト表示する。
 
 ```bash
-# ai-resources から .claude 資産をコピー
-mkdir -p ~/.vdev/.claude
-cp -r /path/to/ai-resources/vibe-coding-partner/claude/commands ~/.vdev/.claude/
-cp -r /path/to/ai-resources/vibe-coding-partner/claude/subagents ~/.vdev/.claude/
-
-# または symlink（非推奨だが可能）
-ln -s /path/to/ai-resources/vibe-coding-partner/claude/commands ~/.vdev/.claude/commands
-ln -s /path/to/ai-resources/vibe-coding-partner/claude/subagents ~/.vdev/.claude/subagents
+vdev ls
 ```
+
+**出力フォーマット**:
+```
+REPO=<repo>	<topic>	<status>	<title>	<updatedAt>
+```
+
+**ソート**: updatedAt 降順
+
+**Broken Topic**: status に BROKEN_STATE を表示
