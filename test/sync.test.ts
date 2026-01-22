@@ -10,13 +10,19 @@ import {
   readRepoClaudeMd,
   writeRepoClaudeMd,
   syncClaudeMd,
+  getGlobalClaudeDir,
+  syncClaudeCommands,
+  syncClaudeSubagents,
+  directoriesDiffer,
 } from '../src/core/claudeMdSync';
 import { newPlan } from '../src/commands/new';
+import { syncCommand } from '../src/commands/sync';
 import { getPlansDir, getTopicDir } from '../src/core/paths';
 
 const TEST_TOPIC_PREFIX = 'test-sync-';
 const GLOBAL_CLAUDE_MD_PATH = join(homedir(), '.vdev', 'CLAUDE.md');
 const GLOBAL_VDEV_DIR = join(homedir(), '.vdev');
+const GLOBAL_CLAUDE_DIR = join(homedir(), '.vdev', '.claude');
 
 let originalGlobalContent: string | null = null;
 let globalExisted = false;
@@ -217,5 +223,265 @@ describe('newPlan with sync', () => {
     expect(result.success).toBe(true);
     expect(result.syncResult).toBeDefined();
     expect(result.syncResult?.success).toBe(true);
+  });
+});
+
+describe('.claude directory sync', () => {
+  const testRepoRoot = join(process.cwd(), 'test-repo-claude-dir');
+  let globalClaudeDirExisted = false;
+  let originalCommandsContent: Map<string, string> = new Map();
+  let originalSubagentsContent: Map<string, string> = new Map();
+
+  function backupGlobalClaudeDir() {
+    globalClaudeDirExisted = existsSync(GLOBAL_CLAUDE_DIR);
+    if (globalClaudeDirExisted) {
+      const commandsDir = join(GLOBAL_CLAUDE_DIR, 'commands');
+      const subagentsDir = join(GLOBAL_CLAUDE_DIR, 'subagents');
+      if (existsSync(commandsDir)) {
+        const files = require('fs').readdirSync(commandsDir);
+        for (const file of files) {
+          originalCommandsContent.set(file, readFileSync(join(commandsDir, file), 'utf8'));
+        }
+      }
+      if (existsSync(subagentsDir)) {
+        const files = require('fs').readdirSync(subagentsDir);
+        for (const file of files) {
+          originalSubagentsContent.set(file, readFileSync(join(subagentsDir, file), 'utf8'));
+        }
+      }
+    }
+  }
+
+  function restoreGlobalClaudeDir() {
+    // Clean up test directories
+    if (existsSync(join(GLOBAL_CLAUDE_DIR, 'commands'))) {
+      rmSync(join(GLOBAL_CLAUDE_DIR, 'commands'), { recursive: true });
+    }
+    if (existsSync(join(GLOBAL_CLAUDE_DIR, 'subagents'))) {
+      rmSync(join(GLOBAL_CLAUDE_DIR, 'subagents'), { recursive: true });
+    }
+
+    // Restore original content
+    if (originalCommandsContent.size > 0) {
+      mkdirSync(join(GLOBAL_CLAUDE_DIR, 'commands'), { recursive: true });
+      for (const [file, content] of originalCommandsContent) {
+        writeFileSync(join(GLOBAL_CLAUDE_DIR, 'commands', file), content, 'utf8');
+      }
+    }
+    if (originalSubagentsContent.size > 0) {
+      mkdirSync(join(GLOBAL_CLAUDE_DIR, 'subagents'), { recursive: true });
+      for (const [file, content] of originalSubagentsContent) {
+        writeFileSync(join(GLOBAL_CLAUDE_DIR, 'subagents', file), content, 'utf8');
+      }
+    }
+  }
+
+  beforeEach(() => {
+    backupGlobal();
+    backupGlobalClaudeDir();
+    mkdirSync(testRepoRoot, { recursive: true });
+  });
+
+  afterEach(() => {
+    restoreGlobal();
+    restoreGlobalClaudeDir();
+    if (existsSync(testRepoRoot)) {
+      rmSync(testRepoRoot, { recursive: true });
+    }
+  });
+
+  it('getGlobalClaudeDir returns correct path', () => {
+    const path = getGlobalClaudeDir();
+    expect(path).toBe(join(homedir(), '.vdev', '.claude'));
+  });
+
+  it('syncClaudeCommands returns sourceMissing when source does not exist', () => {
+    // Ensure commands dir does not exist
+    if (existsSync(join(GLOBAL_CLAUDE_DIR, 'commands'))) {
+      rmSync(join(GLOBAL_CLAUDE_DIR, 'commands'), { recursive: true });
+    }
+    const result = syncClaudeCommands(testRepoRoot, false);
+    expect(result.success).toBe(false);
+    expect(result.sourceMissing).toBe(true);
+  });
+
+  it('syncClaudeCommands copies directory when source exists', () => {
+    // Create source directory with test file
+    const srcDir = join(GLOBAL_CLAUDE_DIR, 'commands');
+    mkdirSync(srcDir, { recursive: true });
+    writeFileSync(join(srcDir, 'test-cmd.md'), '# Test Command\n', 'utf8');
+
+    const result = syncClaudeCommands(testRepoRoot, false);
+    expect(result.success).toBe(true);
+    expect(result.written).toBe(true);
+    expect(existsSync(join(testRepoRoot, '.claude', 'commands', 'test-cmd.md'))).toBe(true);
+    expect(readFileSync(join(testRepoRoot, '.claude', 'commands', 'test-cmd.md'), 'utf8')).toBe('# Test Command\n');
+  });
+
+  it('syncClaudeSubagents returns sourceMissing when source does not exist', () => {
+    // Ensure subagents dir does not exist
+    if (existsSync(join(GLOBAL_CLAUDE_DIR, 'subagents'))) {
+      rmSync(join(GLOBAL_CLAUDE_DIR, 'subagents'), { recursive: true });
+    }
+    const result = syncClaudeSubagents(testRepoRoot, false);
+    expect(result.success).toBe(false);
+    expect(result.sourceMissing).toBe(true);
+  });
+
+  it('syncClaudeSubagents copies directory when source exists', () => {
+    // Create source directory with test file
+    const srcDir = join(GLOBAL_CLAUDE_DIR, 'subagents');
+    mkdirSync(srcDir, { recursive: true });
+    writeFileSync(join(srcDir, 'test-agent.md'), '# Test Subagent\n', 'utf8');
+
+    const result = syncClaudeSubagents(testRepoRoot, false);
+    expect(result.success).toBe(true);
+    expect(result.written).toBe(true);
+    expect(existsSync(join(testRepoRoot, '.claude', 'subagents', 'test-agent.md'))).toBe(true);
+    expect(readFileSync(join(testRepoRoot, '.claude', 'subagents', 'test-agent.md'), 'utf8')).toBe('# Test Subagent\n');
+  });
+
+  it('syncClaudeCommands returns hasDiff=true, written=false when diff exists and force=false', () => {
+    // Create source directory with new content
+    const srcDir = join(GLOBAL_CLAUDE_DIR, 'commands');
+    mkdirSync(srcDir, { recursive: true });
+    writeFileSync(join(srcDir, 'new-cmd.md'), '# New Command\n', 'utf8');
+
+    // Create existing directory with different content
+    const destDir = join(testRepoRoot, '.claude', 'commands');
+    mkdirSync(destDir, { recursive: true });
+    writeFileSync(join(destDir, 'old-cmd.md'), '# Old Command\n', 'utf8');
+
+    const result = syncClaudeCommands(testRepoRoot, false);
+    expect(result.success).toBe(false);
+    expect(result.hasDiff).toBe(true);
+    expect(result.written).toBe(false);
+    // Old file should still exist (not overwritten)
+    expect(existsSync(join(destDir, 'old-cmd.md'))).toBe(true);
+  });
+
+  it('syncClaudeCommands overwrites when diff exists and force=true', () => {
+    // Create source directory with new content
+    const srcDir = join(GLOBAL_CLAUDE_DIR, 'commands');
+    mkdirSync(srcDir, { recursive: true });
+    writeFileSync(join(srcDir, 'new-cmd.md'), '# New Command\n', 'utf8');
+
+    // Create existing directory with different content
+    const destDir = join(testRepoRoot, '.claude', 'commands');
+    mkdirSync(destDir, { recursive: true });
+    writeFileSync(join(destDir, 'old-cmd.md'), '# Old Command\n', 'utf8');
+
+    const result = syncClaudeCommands(testRepoRoot, true);
+    expect(result.success).toBe(true);
+    expect(result.hasDiff).toBe(true);
+    expect(result.written).toBe(true);
+    // Old file should be removed
+    expect(existsSync(join(destDir, 'old-cmd.md'))).toBe(false);
+    // New file should exist
+    expect(existsSync(join(destDir, 'new-cmd.md'))).toBe(true);
+  });
+
+  it('syncClaudeCommands returns hasDiff=false when content is identical', () => {
+    // Create source directory
+    const srcDir = join(GLOBAL_CLAUDE_DIR, 'commands');
+    mkdirSync(srcDir, { recursive: true });
+    writeFileSync(join(srcDir, 'cmd.md'), '# Same Content\n', 'utf8');
+
+    // Create existing directory with same content
+    const destDir = join(testRepoRoot, '.claude', 'commands');
+    mkdirSync(destDir, { recursive: true });
+    writeFileSync(join(destDir, 'cmd.md'), '# Same Content\n', 'utf8');
+
+    const result = syncClaudeCommands(testRepoRoot, false);
+    expect(result.success).toBe(true);
+    expect(result.hasDiff).toBe(false);
+    expect(result.written).toBe(false);
+  });
+});
+
+describe('syncCommand with .claude directories', () => {
+  const originalCwd = process.cwd();
+  const testRepoRoot = join(process.cwd(), 'test-repo-sync-cmd');
+
+  beforeEach(() => {
+    backupGlobal();
+    mkdirSync(testRepoRoot, { recursive: true });
+    process.chdir(testRepoRoot);
+    setGlobalClaudeMd('# Test Rules\n');
+  });
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+    restoreGlobal();
+    if (existsSync(testRepoRoot)) {
+      rmSync(testRepoRoot, { recursive: true });
+    }
+    // Clean up .claude dirs if created
+    if (existsSync(join(GLOBAL_CLAUDE_DIR, 'commands'))) {
+      rmSync(join(GLOBAL_CLAUDE_DIR, 'commands'), { recursive: true });
+    }
+    if (existsSync(join(GLOBAL_CLAUDE_DIR, 'subagents'))) {
+      rmSync(join(GLOBAL_CLAUDE_DIR, 'subagents'), { recursive: true });
+    }
+  });
+
+  it('syncCommand includes commandsResult and subagentsResult', () => {
+    const result = syncCommand(true);
+    expect(result.commandsResult).toBeDefined();
+    expect(result.subagentsResult).toBeDefined();
+    // Both should be sourceMissing since we haven't created them
+    expect(result.commandsResult?.sourceMissing).toBe(true);
+    expect(result.subagentsResult?.sourceMissing).toBe(true);
+    // But overall success should still be true (based on CLAUDE.md)
+    expect(result.success).toBe(true);
+  });
+
+  it('syncCommand copies .claude directories when they exist', () => {
+    // Create source directories
+    mkdirSync(join(GLOBAL_CLAUDE_DIR, 'commands'), { recursive: true });
+    mkdirSync(join(GLOBAL_CLAUDE_DIR, 'subagents'), { recursive: true });
+    writeFileSync(join(GLOBAL_CLAUDE_DIR, 'commands', 'cmd.md'), '# Cmd\n', 'utf8');
+    writeFileSync(join(GLOBAL_CLAUDE_DIR, 'subagents', 'agent.md'), '# Agent\n', 'utf8');
+
+    const result = syncCommand(true);
+    expect(result.commandsResult?.success).toBe(true);
+    expect(result.subagentsResult?.success).toBe(true);
+    expect(existsSync(join(testRepoRoot, '.claude', 'commands', 'cmd.md'))).toBe(true);
+    expect(existsSync(join(testRepoRoot, '.claude', 'subagents', 'agent.md'))).toBe(true);
+  });
+});
+
+describe('newPlan with .claude directories', () => {
+  let createdTopics: string[] = [];
+
+  beforeEach(() => {
+    backupGlobal();
+    createdTopics = [];
+    const plansDir = getPlansDir();
+    mkdirSync(plansDir, { recursive: true });
+    setGlobalClaudeMd('# Test Rules\n');
+  });
+
+  afterEach(() => {
+    restoreGlobal();
+    for (const topic of createdTopics) {
+      removeTopic(topic);
+    }
+    // Clean up .claude dirs if created
+    if (existsSync(join(GLOBAL_CLAUDE_DIR, 'commands'))) {
+      rmSync(join(GLOBAL_CLAUDE_DIR, 'commands'), { recursive: true });
+    }
+    if (existsSync(join(GLOBAL_CLAUDE_DIR, 'subagents'))) {
+      rmSync(join(GLOBAL_CLAUDE_DIR, 'subagents'), { recursive: true });
+    }
+  });
+
+  it('newPlan includes commandsResult and subagentsResult', () => {
+    const result = newPlan(`${TEST_TOPIC_PREFIX}claude-dir`, true);
+    createdTopics.push(result.topic);
+
+    expect(result.success).toBe(true);
+    expect(result.commandsResult).toBeDefined();
+    expect(result.subagentsResult).toBeDefined();
   });
 });

@@ -221,15 +221,17 @@ plan/review/start/impl/impl-review は前提条件を満たさない場合に CO
 
 ---
 
-## 5. CLAUDE.md 運用ルール
+## 5. CLAUDE.md / vdev-flow.md 運用ルール
 
 ### 正本の扱い
 
-- vdev フローで使用する CLAUDE.md の正本は以下に配置する：
+- vdev フローで使用する CLAUDE.md および vdev-flow.md の正本は以下に配置する：
 
   ~/.vdev/CLAUDE.md
+  ~/.vdev/vdev-flow.md
 
-- このファイルは vdev フロー全体に共通な方針のみを記載する。
+- これらのファイルは vdev フロー全体に共通な方針のみを記載する。
+- vdev-flow.md は vdev フローの SoT（Single Source of Truth）である。
 
 ### リポジトリ側の扱い
 
@@ -251,6 +253,19 @@ vdev sync
 vdev sync --force
 ```
 
+### vdev-flow.md のセットアップ
+
+vdev-flow.md を配布するには、正本への symlink を作成する必要がある：
+
+```bash
+# ai-resources リポジトリの vdev-flow.md を正本として symlink 作成
+ln -s /path/to/ai-resources/vibe-coding-partner/knowledges/vdev-flow.md ~/.vdev/vdev-flow.md
+```
+
+- vdev-flow.md の symlink が存在しない場合、`vdev sync` / `vdev new` は警告を出力するが、
+  コマンド自体は成功する（互換維持）。
+- vdev-flow.md を配布したい場合は上記の symlink を作成してから `vdev sync --force` を実行する。
+
 ### vdev new 実行時の同期
 
 - vdev new は内部で sync 相当を実行する
@@ -262,3 +277,58 @@ vdev sync --force
 - グローバル正本（~/.vdev/CLAUDE.md）が存在しない場合:
   - topic は作成される
   - 同期は失敗し exit=1
+
+### .claude 資産（commands / subagents）の運用
+
+#### 配布元の構成
+
+```
+~/.vdev/.claude/
+├── commands/
+│   ├── command1.md
+│   └── command2.md
+└── subagents/
+    ├── subagent1.md
+    └── subagent2.md
+```
+
+- これらのディレクトリは ai-resources からコピーするか、直接作成する。
+- symlink ではなく実体ディレクトリとして配置することを推奨。
+
+#### 同期動作
+
+- `vdev sync` / `vdev new` は ~/.vdev/.claude/ 配下を各リポジトリにコピーする。
+- 同期ポリシーは CLAUDE.md / vdev-flow.md と同様:
+  - 差分なし: 何もしない（up to date）
+  - 差分あり + --force なし: 警告のみ（上書きしない）
+  - 差分あり + --force あり: 上書きコピー
+  - 同期先が存在しない: 新規作成（--force 不要）
+- 同期元が存在しない場合は警告のみ（exit code には影響しない）。
+- .claude 資産の同期失敗は exit code に影響しない（CLAUDE.md の同期結果のみで判定）。
+
+#### 警告メッセージ
+
+同期元欠損時:
+```
+Warning: ~/.vdev/.claude/commands not found (skipped)
+Warning: ~/.vdev/.claude/subagents not found (skipped)
+```
+
+差分検出時（--force なし）:
+```
+Warning: .claude/commands differs from source (~/.vdev/.claude/commands)
+Hint: run 'vdev sync --force' to overwrite repo .claude/commands
+```
+
+#### セットアップ
+
+```bash
+# ai-resources から .claude 資産をコピー
+mkdir -p ~/.vdev/.claude
+cp -r /path/to/ai-resources/vibe-coding-partner/claude/commands ~/.vdev/.claude/
+cp -r /path/to/ai-resources/vibe-coding-partner/claude/subagents ~/.vdev/.claude/
+
+# または symlink（非推奨だが可能）
+ln -s /path/to/ai-resources/vibe-coding-partner/claude/commands ~/.vdev/.claude/commands
+ln -s /path/to/ai-resources/vibe-coding-partner/claude/subagents ~/.vdev/.claude/subagents
+```

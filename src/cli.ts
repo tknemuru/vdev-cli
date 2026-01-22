@@ -61,6 +61,36 @@ program
         }
         process.exit(1);
       }
+      // 【警告】vdev-flow.md の問題は警告として出力（exit code は変えない）
+      if (result.vdevFlowResult && !result.vdevFlowResult.success) {
+        if (result.vdevFlowResult.globalMissing) {
+          console.error('Warning: Global vdev-flow.md not found (~/.vdev/vdev-flow.md)');
+        } else if (result.vdevFlowResult.hasDiff) {
+          console.error('Warning: vdev-flow.md differs from global rules');
+          console.error("Hint: run 'vdev sync --force' to overwrite repo vdev-flow.md");
+        }
+        // exit(1) しない - 警告のみ
+      }
+      // 【警告】.claude/commands の問題は警告として出力（exit code は変えない）
+      if (result.commandsResult && !result.commandsResult.success) {
+        if (result.commandsResult.sourceMissing) {
+          console.error('Warning: ~/.vdev/.claude/commands not found (skipped)');
+        } else if (result.commandsResult.hasDiff) {
+          console.error('Warning: .claude/commands differs from source (~/.vdev/.claude/commands)');
+          console.error("Hint: run 'vdev sync --force' to overwrite repo .claude/commands");
+        }
+        // exit(1) しない - 警告のみ
+      }
+      // 【警告】.claude/subagents の問題は警告として出力（exit code は変えない）
+      if (result.subagentsResult && !result.subagentsResult.success) {
+        if (result.subagentsResult.sourceMissing) {
+          console.error('Warning: ~/.vdev/.claude/subagents not found (skipped)');
+        } else if (result.subagentsResult.hasDiff) {
+          console.error('Warning: .claude/subagents differs from source (~/.vdev/.claude/subagents)');
+          console.error("Hint: run 'vdev sync --force' to overwrite repo .claude/subagents");
+        }
+        // exit(1) しない - 警告のみ
+      }
     } else {
       error(result.message);
       process.exit(1);
@@ -190,9 +220,27 @@ program
   .option('--force', 'Force overwrite even if differs')
   .action((options: { force?: boolean }) => {
     const result = syncCommand(options.force ?? false);
+
+    // CLAUDE.md の結果で成功/失敗を判定（従来通り）
     if (result.success) {
       output(`SYNCED\t${result.message}`);
+
+      // vdev-flow.md の結果を追加出力（成功時のみ）
+      if (result.vdevFlowResult?.success) {
+        output(`SYNCED\t${result.vdevFlowResult.message}`);
+      }
+
+      // .claude/commands の結果を追加出力（成功時のみ）
+      if (result.commandsResult?.success) {
+        output(`SYNCED\t${result.commandsResult.message}`);
+      }
+
+      // .claude/subagents の結果を追加出力（成功時のみ）
+      if (result.subagentsResult?.success) {
+        output(`SYNCED\t${result.subagentsResult.message}`);
+      }
     } else {
+      // CLAUDE.md のエラー処理（既存・変更なし）
       if (result.syncResult.globalMissing) {
         error('Global CLAUDE.md not found (~/.vdev/CLAUDE.md)');
       } else if (result.syncResult.hasDiff) {
@@ -202,6 +250,37 @@ program
         error(result.message);
       }
       process.exit(1);
+    }
+
+    // 【警告】vdev-flow.md の問題は警告として出力（exit code は変えない）
+    if (result.vdevFlowResult && !result.vdevFlowResult.success) {
+      if (result.vdevFlowResult.globalMissing) {
+        console.error('Warning: Global vdev-flow.md not found (~/.vdev/vdev-flow.md)');
+      } else if (result.vdevFlowResult.hasDiff) {
+        console.error('Warning: vdev-flow.md differs from global rules');
+        console.error("Hint: run 'vdev sync --force' to overwrite repo vdev-flow.md");
+      }
+      // exit(1) しない - 警告のみ
+    }
+    // 【警告】.claude/commands の問題は警告として出力（exit code は変えない）
+    if (result.commandsResult && !result.commandsResult.success) {
+      if (result.commandsResult.sourceMissing) {
+        console.error('Warning: ~/.vdev/.claude/commands not found (skipped)');
+      } else if (result.commandsResult.hasDiff) {
+        console.error('Warning: .claude/commands differs from source (~/.vdev/.claude/commands)');
+        console.error("Hint: run 'vdev sync --force' to overwrite repo .claude/commands");
+      }
+      // exit(1) しない - 警告のみ
+    }
+    // 【警告】.claude/subagents の問題は警告として出力（exit code は変えない）
+    if (result.subagentsResult && !result.subagentsResult.success) {
+      if (result.subagentsResult.sourceMissing) {
+        console.error('Warning: ~/.vdev/.claude/subagents not found (skipped)');
+      } else if (result.subagentsResult.hasDiff) {
+        console.error('Warning: .claude/subagents differs from source (~/.vdev/.claude/subagents)');
+        console.error("Hint: run 'vdev sync --force' to overwrite repo .claude/subagents");
+      }
+      // exit(1) しない - 警告のみ
     }
   });
 
