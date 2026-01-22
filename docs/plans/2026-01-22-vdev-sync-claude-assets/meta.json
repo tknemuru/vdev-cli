@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "topic": "2026-01-22-vdev-sync-claude-assets",
+  "title": "Vdev Sync Claude Assets",
+  "status": "DONE",
+  "paths": {
+    "instruction": "instruction.md",
+    "plan": "plan.md",
+    "designReview": "design-review.md",
+    "impl": "impl.md",
+    "implReview": "impl-review.md"
+  },
+  "hashes": {
+    "planSha256": "034b57f9faf2bf54b1e6defa77c537bf29f407f9948906213b4af1137310aedd",
+    "designReviewSha256": "a78c9074d089f66dd92b60dbb980bb1df1c35e2883b8ee6be0a3fc962eb27f4c",
+    "implSha256": "30d6b6948d55288bd0b8aaae731bec80b1208af8f24c03b690e55f9aef033c5f",
+    "implReviewSha256": "7f0546565e3c0b2daedcbe6f9282f637432ab57452dc9956f73a51be01fd4432"
+  },
+  "timestamps": {
+    "createdAt": "2026-01-22T13:34:42+09:00",
+    "updatedAt": "2026-01-22T13:54:25+09:00"
+  }
+}
