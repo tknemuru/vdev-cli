@@ -239,7 +239,7 @@ vdev new <name> [--force]
 1. `<name>` を slug 化し、日付プレフィックスを付与
 2. `docs/plans/<topic>/` ディレクトリを作成
 3. meta.json を初期状態（NEEDS_INSTRUCTION）で作成
-4. グローバル正本（~/.vdev/CLAUDE.md）から同期を試行
+4. ai-resources から同期を試行（CLAUDE.md, vdev-flow.md, commands, subagents, knowledges）
 
 **--force の効果**:
 - 差分があっても上書きする（topic 作成は常に実行）
@@ -254,15 +254,28 @@ vdev new <name> [--force]
 
 ### 5.2 vdev sync
 
-CLAUDE.md をグローバル正本に同期する。
+ai-resources から各種資産を同期する。
 
 ```bash
 vdev sync [--force]
 ```
 
+**同期元（固定）**:
+```
+~/projects/ai-resources/vibe-coding-partner/
+├── claude/
+│   ├── CLAUDE.md          → repo root/CLAUDE.md
+│   ├── commands/          → repo root/.claude/commands/
+│   ├── subagents/         → repo root/.claude/subagents/
+│   └── knowledge-manifest.txt
+└── knowledges/
+    ├── vdev-flow.md       → repo root/vdev-flow.md
+    └── *.md               → repo root/.claude/knowledges/ (allowlist のみ)
+```
+
 **デフォルト動作**（--force なし）:
-- 差分があれば stderr にエラーを出力し exit 1
-- 上書きは行わない
+- CLAUDE.md に差分があれば stderr にエラーを出力し exit 1
+- その他の資産は差分があっても警告のみ（exit code に影響しない）
 
 **--force 指定時**:
 - 差分があっても常に上書き
@@ -271,21 +284,11 @@ vdev sync [--force]
 **差分判定**:
 - Last synced 行は比較対象から除外
 
-### 5.3 vdev-flow.md のセットアップ
-
-vdev-flow.md を配布するには、正本への symlink を作成する:
-
-```bash
-ln -s /path/to/ai-resources/vibe-coding-partner/knowledges/vdev-flow.md ~/.vdev/vdev-flow.md
-```
-
-symlink が存在しない場合、`vdev sync` / `vdev new` は警告を出力するが、コマンド自体は成功する。
-
-### 5.4 .claude 資産（commands / subagents）の同期
+### 5.3 .claude 資産（commands / subagents）の同期
 
 **配布元の構成**:
 ```
-~/.vdev/.claude/
+~/projects/ai-resources/vibe-coding-partner/claude/
 ├── commands/
 │   └── *.md
 └── subagents/
@@ -301,6 +304,36 @@ symlink が存在しない場合、`vdev sync` / `vdev new` は警告を出力�
 **注意点**:
 - 同期元が存在しない場合は警告のみ（exit code には影響しない）
 - .claude 資産の同期失敗は exit code に影響しない
+
+### 5.4 knowledges の同期（allowlist 方式）
+
+**配布元**:
+```
+~/projects/ai-resources/vibe-coding-partner/
+├── claude/
+│   └── knowledge-manifest.txt  (allowlist)
+└── knowledges/
+    └── *.md
+```
+
+**同期先**:
+```
+repo root/.claude/knowledges/
+```
+
+**allowlist（knowledge-manifest.txt）の形式**:
+- 1 行 1 ファイル名（拡張子込み）
+- 空行は無視
+- `#` で始まる行はコメントとして無視
+
+**同期ポリシー**:
+- manifest に記載されたファイルのみを同期する
+- manifest に記載されたファイルが knowledges/ に存在しない場合はエラーで停止
+- 同期先に余分なファイルがある場合は削除される（--force 時）
+
+**注意点**:
+- manifest が存在しない場合は警告のみ
+- knowledges の同期失敗は exit code に影響しない
 
 ---
 
