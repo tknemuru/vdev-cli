@@ -147,6 +147,60 @@ describe('gate logic v2', () => {
       const result = checkGate(testTopic);
       expect(result.exitCode).toBe(ExitCode.BROKEN_STATE);
     });
+
+    it('returns BROKEN_STATE when DONE but planSha256 is null', () => {
+      const designReviewContent = 'Status: DESIGN_APPROVED';
+      const implContent = '# Impl';
+      const implReviewContent = 'Status: DONE';
+      createTopic(testTopic);
+      writeFile(testTopic, 'instruction.md', '# Instruction');
+      writeFile(testTopic, 'plan.md', '# Plan');
+      writeFile(testTopic, 'design-review.md', designReviewContent);
+      writeFile(testTopic, 'impl.md', implContent);
+      writeFile(testTopic, 'impl-review.md', implReviewContent);
+      writeMeta(
+        testTopic,
+        createValidMeta(
+          testTopic,
+          'DONE',
+          null, // planSha256 is null
+          sha256(designReviewContent),
+          sha256(implContent),
+          sha256(implReviewContent)
+        )
+      );
+
+      const result = checkGate(testTopic);
+      expect(result.exitCode).toBe(ExitCode.BROKEN_STATE);
+      expect(result.message).toContain('hash mismatch');
+    });
+
+    it('returns BROKEN_STATE when DONE but implSha256 is null', () => {
+      const planContent = '# Plan';
+      const designReviewContent = 'Status: DESIGN_APPROVED';
+      const implReviewContent = 'Status: DONE';
+      createTopic(testTopic);
+      writeFile(testTopic, 'instruction.md', '# Instruction');
+      writeFile(testTopic, 'plan.md', planContent);
+      writeFile(testTopic, 'design-review.md', designReviewContent);
+      writeFile(testTopic, 'impl.md', '# Impl');
+      writeFile(testTopic, 'impl-review.md', implReviewContent);
+      writeMeta(
+        testTopic,
+        createValidMeta(
+          testTopic,
+          'DONE',
+          sha256(planContent),
+          sha256(designReviewContent),
+          null, // implSha256 is null
+          sha256(implReviewContent)
+        )
+      );
+
+      const result = checkGate(testTopic);
+      expect(result.exitCode).toBe(ExitCode.BROKEN_STATE);
+      expect(result.message).toContain('hash mismatch');
+    });
   });
 
   describe('Priority 3: instruction.md missing', () => {

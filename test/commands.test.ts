@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync, existsSync } from 'fs';
+import { mkdirSync, rmSync, existsSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import { newPlan } from '../src/commands/new';
 import { savePlan } from '../src/commands/plan';
 import { saveReview } from '../src/commands/review';
@@ -222,6 +223,22 @@ describe('review command', () => {
     expect(result.success).toBe(true);
     expect(result.status).toBe('DESIGN_APPROVED');
   });
+
+  it('fails when planSha256 is null (plan.md exists but vdev plan not executed)', () => {
+    const { topic } = newPlan(`${TEST_TOPIC_PREFIX}review-no-plan-hash`);
+    createdTopics.push(topic);
+    saveInstruction(topic, '# Instruction');
+
+    // Manually create plan.md (bypassing vdev plan)
+    const topicDir = getTopicDir(topic);
+    const planPath = join(topicDir, 'plan.md');
+    writeFileSync(planPath, '# Manually created plan');
+
+    // plan.md exists but planSha256 is null
+    const result = saveReview(topic, 'Status: DESIGN_APPROVED');
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('planSha256 not set');
+  });
 });
 
 describe('start command', () => {
@@ -386,6 +403,25 @@ describe('impl-review command', () => {
     const result = saveImplReview(topic, 'No status line');
     expect(result.success).toBe(false);
     expect(result.message).toContain('Status extraction failed');
+  });
+
+  it('fails when implSha256 is null (impl.md exists but vdev impl not executed)', () => {
+    const { topic } = newPlan(`${TEST_TOPIC_PREFIX}impl-review-no-impl-hash`);
+    createdTopics.push(topic);
+    saveInstruction(topic, '# Instruction');
+    savePlan(topic, '# Plan');
+    saveReview(topic, 'Status: DESIGN_APPROVED');
+    startImplementation(topic);
+
+    // Manually create impl.md (bypassing vdev impl)
+    const topicDir = getTopicDir(topic);
+    const implPath = join(topicDir, 'impl.md');
+    writeFileSync(implPath, '# Manually created impl');
+
+    // impl.md exists but implSha256 is null
+    const result = saveImplReview(topic, 'Status: DONE');
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('implSha256 not set');
   });
 });
 
