@@ -61,12 +61,22 @@ export function saveReview(topic: string, content: string): ReviewResult {
     };
   }
 
+  // Precondition: planSha256 must be set (vdev plan must have been executed)
+  const meta = metaResult.meta;
+  if (!meta.hashes.planSha256) {
+    return {
+      success: false,
+      topic,
+      status: null,
+      message: 'planSha256 not set: run vdev plan first',
+    };
+  }
+
   const normalizedContent = normalizeLF(content);
   const designReviewPath = getDesignReviewPath(topic);
   writeFileSync(designReviewPath, normalizedContent, 'utf8');
 
   const extractedStatus = extractStatus(normalizedContent);
-  const meta = metaResult.meta;
 
   if (extractedStatus === null) {
     // Status extraction failed -> COMMAND_ERROR

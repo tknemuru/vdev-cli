@@ -61,12 +61,22 @@ export function saveImplReview(topic: string, content: string): ImplReviewResult
     };
   }
 
+  // Precondition: implSha256 must be set (vdev impl must have been executed)
+  const meta = metaResult.meta;
+  if (!meta.hashes.implSha256) {
+    return {
+      success: false,
+      topic,
+      status: null,
+      message: 'implSha256 not set: run vdev impl first',
+    };
+  }
+
   const normalizedContent = normalizeLF(content);
   const implReviewPath = getImplReviewPath(topic);
   writeFileSync(implReviewPath, normalizedContent, 'utf8');
 
   const extractedStatus = extractStatus(normalizedContent);
-  const meta = metaResult.meta;
 
   if (extractedStatus === null) {
     // Status extraction failed -> COMMAND_ERROR
