@@ -8,8 +8,10 @@ import {
   syncVdevFlow,
   syncClaudeCommands,
   syncClaudeSubagents,
+  syncKnowledges,
   SyncResult,
   DirSyncResult,
+  KnowledgesSyncResult,
 } from '../core/claudeMdSync';
 
 export interface NewResult {
@@ -21,6 +23,7 @@ export interface NewResult {
   vdevFlowResult?: SyncResult;
   commandsResult?: DirSyncResult;
   subagentsResult?: DirSyncResult;
+  knowledgesResult?: KnowledgesSyncResult;
 }
 
 export function newPlan(name: string, force: boolean = false): NewResult {
@@ -53,8 +56,9 @@ export function newPlan(name: string, force: boolean = false): NewResult {
   const vdevFlowResult = syncVdevFlow(process.cwd(), force);
   const commandsResult = syncClaudeCommands(process.cwd(), force);
   const subagentsResult = syncClaudeSubagents(process.cwd(), force);
+  const knowledgesResult = syncKnowledges(process.cwd(), force);
 
-  // 【互換維持】new の成功判定には vdevFlowResult, commandsResult, subagentsResult を含めない
+  // 【互換維持】new の成功判定には vdevFlowResult, commandsResult, subagentsResult, knowledgesResult を含めない
   // これらは呼び出し側で警告表示に使用
 
   return {
@@ -66,5 +70,6 @@ export function newPlan(name: string, force: boolean = false): NewResult {
     vdevFlowResult,
     commandsResult,
     subagentsResult,
+    knowledgesResult,
   };
 }

@@ -54,9 +54,13 @@ program
       output(`CREATED\t${result.topic}\t${result.path}`);
       if (result.syncResult && !result.syncResult.success) {
         if (result.syncResult.globalMissing) {
-          error('Global CLAUDE.md not found (~/.vdev/CLAUDE.md)');
+          error(
+            'Global CLAUDE.md not found (~/projects/ai-resources/vibe-coding-partner/claude/CLAUDE.md)'
+          );
         } else if (result.syncResult.hasDiff) {
-          error('CLAUDE.md differs from global rules (source=~/.vdev/CLAUDE.md)');
+          error(
+            'CLAUDE.md differs from global rules (source=~/projects/ai-resources/vibe-coding-partner/claude/CLAUDE.md)'
+          );
           console.error("Hint: run 'vdev sync --force' to overwrite repo CLAUDE.md");
         }
         process.exit(1);
@@ -64,7 +68,9 @@ program
       // 【警告】vdev-flow.md の問題は警告として出力（exit code は変えない）
       if (result.vdevFlowResult && !result.vdevFlowResult.success) {
         if (result.vdevFlowResult.globalMissing) {
-          console.error('Warning: Global vdev-flow.md not found (~/.vdev/vdev-flow.md)');
+          console.error(
+            'Warning: Global vdev-flow.md not found (~/projects/ai-resources/vibe-coding-partner/knowledges/vdev-flow.md)'
+          );
         } else if (result.vdevFlowResult.hasDiff) {
           console.error('Warning: vdev-flow.md differs from global rules');
           console.error("Hint: run 'vdev sync --force' to overwrite repo vdev-flow.md");
@@ -74,9 +80,13 @@ program
       // 【警告】.claude/commands の問題は警告として出力（exit code は変えない）
       if (result.commandsResult && !result.commandsResult.success) {
         if (result.commandsResult.sourceMissing) {
-          console.error('Warning: ~/.vdev/.claude/commands not found (skipped)');
+          console.error(
+            'Warning: ~/projects/ai-resources/vibe-coding-partner/claude/commands not found (skipped)'
+          );
         } else if (result.commandsResult.hasDiff) {
-          console.error('Warning: .claude/commands differs from source (~/.vdev/.claude/commands)');
+          console.error(
+            'Warning: .claude/commands differs from source (~/projects/ai-resources/vibe-coding-partner/claude/commands)'
+          );
           console.error("Hint: run 'vdev sync --force' to overwrite repo .claude/commands");
         }
         // exit(1) しない - 警告のみ
@@ -84,10 +94,30 @@ program
       // 【警告】.claude/subagents の問題は警告として出力（exit code は変えない）
       if (result.subagentsResult && !result.subagentsResult.success) {
         if (result.subagentsResult.sourceMissing) {
-          console.error('Warning: ~/.vdev/.claude/subagents not found (skipped)');
+          console.error(
+            'Warning: ~/projects/ai-resources/vibe-coding-partner/claude/subagents not found (skipped)'
+          );
         } else if (result.subagentsResult.hasDiff) {
-          console.error('Warning: .claude/subagents differs from source (~/.vdev/.claude/subagents)');
+          console.error(
+            'Warning: .claude/subagents differs from source (~/projects/ai-resources/vibe-coding-partner/claude/subagents)'
+          );
           console.error("Hint: run 'vdev sync --force' to overwrite repo .claude/subagents");
+        }
+        // exit(1) しない - 警告のみ
+      }
+      // 【警告】.claude/knowledges の問題は警告として出力（exit code は変えない）
+      if (result.knowledgesResult && !result.knowledgesResult.success) {
+        if (result.knowledgesResult.manifestMissing) {
+          console.error(
+            'Warning: knowledge-manifest.txt not found (~/projects/ai-resources/vibe-coding-partner/claude/knowledge-manifest.txt)'
+          );
+        } else if (result.knowledgesResult.missingFiles.length > 0) {
+          console.error(
+            `Warning: Missing files in knowledges/: ${result.knowledgesResult.missingFiles.join(', ')}`
+          );
+        } else if (result.knowledgesResult.hasDiff) {
+          console.error('Warning: .claude/knowledges differs from source');
+          console.error("Hint: run 'vdev sync --force' to overwrite repo .claude/knowledges");
         }
         // exit(1) しない - 警告のみ
       }
@@ -239,12 +269,21 @@ program
       if (result.subagentsResult?.success) {
         output(`SYNCED\t${result.subagentsResult.message}`);
       }
+
+      // .claude/knowledges の結果を追加出力（成功時のみ）
+      if (result.knowledgesResult?.success) {
+        output(`SYNCED\t${result.knowledgesResult.message}`);
+      }
     } else {
-      // CLAUDE.md のエラー処理（既存・変更なし）
+      // CLAUDE.md のエラー処理
       if (result.syncResult.globalMissing) {
-        error('Global CLAUDE.md not found (~/.vdev/CLAUDE.md)');
+        error(
+          'Global CLAUDE.md not found (~/projects/ai-resources/vibe-coding-partner/claude/CLAUDE.md)'
+        );
       } else if (result.syncResult.hasDiff) {
-        error('CLAUDE.md differs from global rules (source=~/.vdev/CLAUDE.md)');
+        error(
+          'CLAUDE.md differs from global rules (source=~/projects/ai-resources/vibe-coding-partner/claude/CLAUDE.md)'
+        );
         console.error("Hint: run 'vdev sync --force' to overwrite repo CLAUDE.md");
       } else {
         error(result.message);
@@ -255,7 +294,9 @@ program
     // 【警告】vdev-flow.md の問題は警告として出力（exit code は変えない）
     if (result.vdevFlowResult && !result.vdevFlowResult.success) {
       if (result.vdevFlowResult.globalMissing) {
-        console.error('Warning: Global vdev-flow.md not found (~/.vdev/vdev-flow.md)');
+        console.error(
+          'Warning: Global vdev-flow.md not found (~/projects/ai-resources/vibe-coding-partner/knowledges/vdev-flow.md)'
+        );
       } else if (result.vdevFlowResult.hasDiff) {
         console.error('Warning: vdev-flow.md differs from global rules');
         console.error("Hint: run 'vdev sync --force' to overwrite repo vdev-flow.md");
@@ -265,9 +306,13 @@ program
     // 【警告】.claude/commands の問題は警告として出力（exit code は変えない）
     if (result.commandsResult && !result.commandsResult.success) {
       if (result.commandsResult.sourceMissing) {
-        console.error('Warning: ~/.vdev/.claude/commands not found (skipped)');
+        console.error(
+          'Warning: ~/projects/ai-resources/vibe-coding-partner/claude/commands not found (skipped)'
+        );
       } else if (result.commandsResult.hasDiff) {
-        console.error('Warning: .claude/commands differs from source (~/.vdev/.claude/commands)');
+        console.error(
+          'Warning: .claude/commands differs from source (~/projects/ai-resources/vibe-coding-partner/claude/commands)'
+        );
         console.error("Hint: run 'vdev sync --force' to overwrite repo .claude/commands");
       }
       // exit(1) しない - 警告のみ
@@ -275,10 +320,30 @@ program
     // 【警告】.claude/subagents の問題は警告として出力（exit code は変えない）
     if (result.subagentsResult && !result.subagentsResult.success) {
       if (result.subagentsResult.sourceMissing) {
-        console.error('Warning: ~/.vdev/.claude/subagents not found (skipped)');
+        console.error(
+          'Warning: ~/projects/ai-resources/vibe-coding-partner/claude/subagents not found (skipped)'
+        );
       } else if (result.subagentsResult.hasDiff) {
-        console.error('Warning: .claude/subagents differs from source (~/.vdev/.claude/subagents)');
+        console.error(
+          'Warning: .claude/subagents differs from source (~/projects/ai-resources/vibe-coding-partner/claude/subagents)'
+        );
         console.error("Hint: run 'vdev sync --force' to overwrite repo .claude/subagents");
+      }
+      // exit(1) しない - 警告のみ
+    }
+    // 【警告】.claude/knowledges の問題は警告として出力（exit code は変えない）
+    if (result.knowledgesResult && !result.knowledgesResult.success) {
+      if (result.knowledgesResult.manifestMissing) {
+        console.error(
+          'Warning: knowledge-manifest.txt not found (~/projects/ai-resources/vibe-coding-partner/claude/knowledge-manifest.txt)'
+        );
+      } else if (result.knowledgesResult.missingFiles.length > 0) {
+        console.error(
+          `Warning: Missing files in knowledges/: ${result.knowledgesResult.missingFiles.join(', ')}`
+        );
+      } else if (result.knowledgesResult.hasDiff) {
+        console.error('Warning: .claude/knowledges differs from source');
+        console.error("Hint: run 'vdev sync --force' to overwrite repo .claude/knowledges");
       }
       // exit(1) しない - 警告のみ
     }

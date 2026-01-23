@@ -3,8 +3,10 @@ import {
   syncVdevFlow,
   syncClaudeCommands,
   syncClaudeSubagents,
+  syncKnowledges,
   SyncResult,
   DirSyncResult,
+  KnowledgesSyncResult,
 } from '../core/claudeMdSync';
 
 export interface SyncCommandResult {
@@ -14,6 +16,7 @@ export interface SyncCommandResult {
   vdevFlowResult?: SyncResult;
   commandsResult?: DirSyncResult;
   subagentsResult?: DirSyncResult;
+  knowledgesResult?: KnowledgesSyncResult;
 }
 
 export function syncCommand(force: boolean): SyncCommandResult {
@@ -22,9 +25,10 @@ export function syncCommand(force: boolean): SyncCommandResult {
   const vdevFlowResult = syncVdevFlow(repoRoot, force);
   const commandsResult = syncClaudeCommands(repoRoot, force);
   const subagentsResult = syncClaudeSubagents(repoRoot, force);
+  const knowledgesResult = syncKnowledges(repoRoot, force);
 
   // 【互換維持】成功判定は従来通り CLAUDE.md のみを基準とする
-  // vdev-flow.md, commands, subagents の結果は success に影響しない
+  // vdev-flow.md, commands, subagents, knowledges の結果は success に影響しない
   const success = syncResult.success;
 
   return {
@@ -34,5 +38,6 @@ export function syncCommand(force: boolean): SyncCommandResult {
     vdevFlowResult,
     commandsResult,
     subagentsResult,
+    knowledgesResult,
   };
 }

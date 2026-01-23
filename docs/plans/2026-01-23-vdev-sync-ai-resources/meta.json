@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "topic": "2026-01-23-vdev-sync-ai-resources",
+  "title": "Vdev Sync Ai Resources",
+  "status": "DONE",
+  "paths": {
+    "instruction": "instruction.md",
+    "plan": "plan.md",
+    "designReview": "design-review.md",
+    "impl": "impl.md",
+    "implReview": "impl-review.md"
+  },
+  "hashes": {
+    "planSha256": "047d3fa9f988584840c649f7033d842abc70adb1e91450d2763c2b1a104279d2",
+    "designReviewSha256": "733c6ac19ad92c73bee57984cd0970186670c80d7603f97226a0b55e3c07e1f2",
+    "implSha256": "f67e98588ae8b26bbca5eae6b42c3285d17f8eb1dbaee63c4d7866254ae35a0b",
+    "implReviewSha256": "9ede858493cb8f6461819568038a22237e3ffb3337455d8c24ec943a1f2f18d6"
+  },
+  "timestamps": {
+    "createdAt": "2026-01-23T17:10:39+09:00",
+    "updatedAt": "2026-01-23T17:26:47+09:00"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "topic": "2026-01-22-vdev-cli-ops-refresh",
+  "title": "Vdev Cli Ops Refresh",
+  "status": "DONE",
+  "paths": {
+    "instruction": "instruction.md",
+    "plan": "plan.md",
+    "designReview": "design-review.md",
+    "impl": "impl.md",
+    "implReview": "impl-review.md"
+  },
+  "hashes": {
+    "planSha256": "0e98960413e6e20d20b914dc16de7a85bc70d65c30fff96ea6bbcd4220ed0e05",
+    "designReviewSha256": "3da933866f0d4e1a44ec4830c19aceae240fcc02a03d3bf1073302c87644c679",
+    "implSha256": "d54e34f42b66a171da9dc71411f3d59e0b4779700c44569624311d17a1dce10c",
+    "implReviewSha256": "5d661eb15b33bb52d8b9d600afc18b6fd3f57fec5cabeee0638670a18e7472c7"
+  },
+  "timestamps": {
+    "createdAt": "2026-01-22T14:54:04+09:00",
+    "updatedAt": "2026-01-23T00:46:15+09:00"
+  }
+}
