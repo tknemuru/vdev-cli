@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "topic": "2026-01-23-vdev-sync-claude-dir-fix",
+  "title": "Vdev Sync Claude Dir Fix",
+  "status": "DONE",
+  "paths": {
+    "instruction": "instruction.md",
+    "plan": "plan.md",
+    "designReview": "design-review.md",
+    "impl": "impl.md",
+    "implReview": "impl-review.md"
+  },
+  "hashes": {
+    "planSha256": "8771e96041cbbdc8506779059d31711bb609e826e0259a417b66acbcb5f9572a",
+    "designReviewSha256": "a54ce28f01ddb6ee6b4b151a379e4895017dd8e9988f4c5558e0be8dbae57614",
+    "implSha256": "2f28273b4f7ab6f5ce939195034bcd14033480a1c2ce69c1b536302d543eae55",
+    "implReviewSha256": "205db6c682519281d4f510efbbf9dd667ced500cbb70cabde3d3e38d25c16c80"
+  },
+  "timestamps": {
+    "createdAt": "2026-01-23T17:43:37+09:00",
+    "updatedAt": "2026-01-23T17:55:39+09:00"
+  }
+}

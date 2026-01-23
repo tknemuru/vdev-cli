@@ -77,31 +77,17 @@ program
         }
         // exit(1) しない - 警告のみ
       }
-      // 【警告】.claude/commands の問題は警告として出力（exit code は変えない）
-      if (result.commandsResult && !result.commandsResult.success) {
-        if (result.commandsResult.sourceMissing) {
+      // 【警告】.claude の問題は警告として出力（exit code は変えない）
+      if (result.claudeDirResult && !result.claudeDirResult.success) {
+        if (result.claudeDirResult.sourceMissing) {
           console.error(
-            'Warning: ~/projects/ai-resources/vibe-coding-partner/claude/commands not found (skipped)'
+            'Warning: ~/projects/ai-resources/vibe-coding-partner/claude not found (skipped)'
           );
-        } else if (result.commandsResult.hasDiff) {
+        } else if (result.claudeDirResult.hasDiff) {
           console.error(
-            'Warning: .claude/commands differs from source (~/projects/ai-resources/vibe-coding-partner/claude/commands)'
+            'Warning: .claude differs from source (~/projects/ai-resources/vibe-coding-partner/claude)'
           );
-          console.error("Hint: run 'vdev sync --force' to overwrite repo .claude/commands");
-        }
-        // exit(1) しない - 警告のみ
-      }
-      // 【警告】.claude/subagents の問題は警告として出力（exit code は変えない）
-      if (result.subagentsResult && !result.subagentsResult.success) {
-        if (result.subagentsResult.sourceMissing) {
-          console.error(
-            'Warning: ~/projects/ai-resources/vibe-coding-partner/claude/subagents not found (skipped)'
-          );
-        } else if (result.subagentsResult.hasDiff) {
-          console.error(
-            'Warning: .claude/subagents differs from source (~/projects/ai-resources/vibe-coding-partner/claude/subagents)'
-          );
-          console.error("Hint: run 'vdev sync --force' to overwrite repo .claude/subagents");
+          console.error("Hint: run 'vdev sync --force' to overwrite repo .claude");
         }
         // exit(1) しない - 警告のみ
       }
@@ -260,14 +246,9 @@ program
         output(`SYNCED\t${result.vdevFlowResult.message}`);
       }
 
-      // .claude/commands の結果を追加出力（成功時のみ）
-      if (result.commandsResult?.success) {
-        output(`SYNCED\t${result.commandsResult.message}`);
-      }
-
-      // .claude/subagents の結果を追加出力（成功時のみ）
-      if (result.subagentsResult?.success) {
-        output(`SYNCED\t${result.subagentsResult.message}`);
+      // .claude の結果を追加出力（成功時のみ）
+      if (result.claudeDirResult?.success) {
+        output(`SYNCED\t${result.claudeDirResult.message}`);
       }
 
       // .claude/knowledges の結果を追加出力（成功時のみ）
@@ -303,31 +284,17 @@ program
       }
       // exit(1) しない - 警告のみ
     }
-    // 【警告】.claude/commands の問題は警告として出力（exit code は変えない）
-    if (result.commandsResult && !result.commandsResult.success) {
-      if (result.commandsResult.sourceMissing) {
+    // 【警告】.claude の問題は警告として出力（exit code は変えない）
+    if (result.claudeDirResult && !result.claudeDirResult.success) {
+      if (result.claudeDirResult.sourceMissing) {
         console.error(
-          'Warning: ~/projects/ai-resources/vibe-coding-partner/claude/commands not found (skipped)'
+          'Warning: ~/projects/ai-resources/vibe-coding-partner/claude not found (skipped)'
         );
-      } else if (result.commandsResult.hasDiff) {
+      } else if (result.claudeDirResult.hasDiff) {
         console.error(
-          'Warning: .claude/commands differs from source (~/projects/ai-resources/vibe-coding-partner/claude/commands)'
+          'Warning: .claude differs from source (~/projects/ai-resources/vibe-coding-partner/claude)'
         );
-        console.error("Hint: run 'vdev sync --force' to overwrite repo .claude/commands");
-      }
-      // exit(1) しない - 警告のみ
-    }
-    // 【警告】.claude/subagents の問題は警告として出力（exit code は変えない）
-    if (result.subagentsResult && !result.subagentsResult.success) {
-      if (result.subagentsResult.sourceMissing) {
-        console.error(
-          'Warning: ~/projects/ai-resources/vibe-coding-partner/claude/subagents not found (skipped)'
-        );
-      } else if (result.subagentsResult.hasDiff) {
-        console.error(
-          'Warning: .claude/subagents differs from source (~/projects/ai-resources/vibe-coding-partner/claude/subagents)'
-        );
-        console.error("Hint: run 'vdev sync --force' to overwrite repo .claude/subagents");
+        console.error("Hint: run 'vdev sync --force' to overwrite repo .claude");
       }
       // exit(1) しない - 警告のみ
     }

@@ -6,8 +6,7 @@ import { getTopicDir } from '../core/paths';
 import {
   syncClaudeMd,
   syncVdevFlow,
-  syncClaudeCommands,
-  syncClaudeSubagents,
+  syncClaudeDir,
   syncKnowledges,
   SyncResult,
   DirSyncResult,
@@ -21,8 +20,7 @@ export interface NewResult {
   message: string;
   syncResult?: SyncResult;
   vdevFlowResult?: SyncResult;
-  commandsResult?: DirSyncResult;
-  subagentsResult?: DirSyncResult;
+  claudeDirResult?: DirSyncResult;
   knowledgesResult?: KnowledgesSyncResult;
 }
 
@@ -54,11 +52,10 @@ export function newPlan(name: string, force: boolean = false): NewResult {
 
   const syncResult = syncClaudeMd(process.cwd(), force);
   const vdevFlowResult = syncVdevFlow(process.cwd(), force);
-  const commandsResult = syncClaudeCommands(process.cwd(), force);
-  const subagentsResult = syncClaudeSubagents(process.cwd(), force);
+  const claudeDirResult = syncClaudeDir(process.cwd(), force);
   const knowledgesResult = syncKnowledges(process.cwd(), force);
 
-  // 【互換維持】new の成功判定には vdevFlowResult, commandsResult, subagentsResult, knowledgesResult を含めない
+  // 【互換維持】new の成功判定には vdevFlowResult, claudeDirResult, knowledgesResult を含めない
   // これらは呼び出し側で警告表示に使用
 
   return {
@@ -68,8 +65,7 @@ export function newPlan(name: string, force: boolean = false): NewResult {
     message: 'created',
     syncResult,
     vdevFlowResult,
-    commandsResult,
-    subagentsResult,
+    claudeDirResult,
     knowledgesResult,
   };
 }

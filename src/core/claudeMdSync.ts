@@ -229,19 +229,26 @@ export interface DirSyncResult {
   message: string;
 }
 
-export function copyDirRecursive(src: string, dest: string): void {
+export function copyDirRecursive(
+  src: string,
+  dest: string,
+  excludePatterns: string[] = []
+): void {
   if (!existsSync(dest)) {
     mkdirSync(dest, { recursive: true });
   }
 
   const entries = readdirSync(src);
   for (const entry of entries) {
+    if (excludePatterns.includes(entry)) {
+      continue;
+    }
     const srcPath = join(src, entry);
     const destPath = join(dest, entry);
     const stat = statSync(srcPath);
 
     if (stat.isDirectory()) {
-      copyDirRecursive(srcPath, destPath);
+      copyDirRecursive(srcPath, destPath, excludePatterns);
     } else {
       copyFileSync(srcPath, destPath);
     }
@@ -249,13 +256,19 @@ export function copyDirRecursive(src: string, dest: string): void {
 }
 
 // Compare two directories recursively to detect differences
-export function directoriesDiffer(srcDir: string, destDir: string): boolean {
+export function directoriesDiffer(
+  srcDir: string,
+  destDir: string,
+  excludePatterns: string[] = []
+): boolean {
   // If dest doesn't exist, there's a difference
   if (!existsSync(destDir)) {
     return true;
   }
 
-  const srcEntries = readdirSync(srcDir).sort();
+  const srcEntries = readdirSync(srcDir)
+    .filter((e) => !excludePatterns.includes(e))
+    .sort();
   const destEntries = readdirSync(destDir).sort();
 
   // Check if file lists differ
@@ -285,7 +298,7 @@ export function directoriesDiffer(srcDir: string, destDir: string): boolean {
     }
 
     if (srcStat.isDirectory()) {
-      if (directoriesDiffer(srcPath, destPath)) {
+      if (directoriesDiffer(srcPath, destPath, excludePatterns)) {
         return true;
       }
     } else {
@@ -300,6 +313,69 @@ export function directoriesDiffer(srcDir: string, destDir: string): boolean {
 
   return false;
 }
+
+// Excluded files when syncing claude/ directory to .claude/
+// CLAUDE.md is handled separately by syncClaudeMd() to repo root
+const CLAUDE_DIR_EXCLUDE_PATTERNS = ['CLAUDE.md'];
+
+export function syncClaudeDir(repoRoot: string, force: boolean): DirSyncResult {
+  const srcDir = getGlobalClaudeDir();
+
+  if (!existsSync(srcDir)) {
+    return {
+      success: false,
+      written: false,
+      hasDiff: false,
+      sourceMissing: true,
+      message:
+        '~/projects/ai-resources/vibe-coding-partner/claude not found',
+    };
+  }
+
+  const destDir = join(repoRoot, '.claude');
+  const destExists = existsSync(destDir);
+  const hasDiff = directoriesDiffer(srcDir, destDir, CLAUDE_DIR_EXCLUDE_PATTERNS);
+
+  // No difference - nothing to do
+  if (!hasDiff) {
+    return {
+      success: true,
+      written: false,
+      hasDiff: false,
+      sourceMissing: false,
+      message: '.claude is up to date',
+    };
+  }
+
+  // Has difference - check if we should write
+  if (force || !destExists) {
+    // Remove existing directory before copy to ensure clean state
+    if (destExists) {
+      rmSync(destDir, { recursive: true });
+    }
+    copyDirRecursive(srcDir, destDir, CLAUDE_DIR_EXCLUDE_PATTERNS);
+
+    return {
+      success: true,
+      written: true,
+      hasDiff: true,
+      sourceMissing: false,
+      message: !destExists ? '.claude created' : '.claude updated',
+    };
+  }
+
+  // Has difference but no force - report diff without writing
+  return {
+    success: false,
+    written: false,
+    hasDiff: true,
+    sourceMissing: false,
+    message: '.claude differs from source',
+  };
+}
+
+// Legacy functions kept for backward compatibility (deprecated)
+// Use syncClaudeDir() instead
 
 export function syncClaudeCommands(repoRoot: string, force: boolean): DirSyncResult {
   const srcDir = join(getGlobalClaudeDir(), 'commands');
