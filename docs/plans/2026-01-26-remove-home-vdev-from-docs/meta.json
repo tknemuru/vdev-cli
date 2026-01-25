@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "topic": "2026-01-26-remove-home-vdev-from-docs",
+  "title": "Remove Home Vdev From Docs",
+  "status": "DONE",
+  "paths": {
+    "instruction": "instruction.md",
+    "plan": "plan.md",
+    "designReview": "design-review.md",
+    "impl": "impl.md",
+    "implReview": "impl-review.md"
+  },
+  "hashes": {
+    "planSha256": "84151b5a95fb1ee2702f608fd1832e818cda6f433e1e62e11c7a9031150d3069",
+    "designReviewSha256": "f9c13f08d39a8d7b70d2d3353cc26783952edd294cde32eb65a7cc51bdd0a19a",
+    "implSha256": "83ecb5b05f193e1fd1ed7184de1907bcb57a7321284b94d080a09ba49ae83b60",
+    "implReviewSha256": "fc584b88be42c558d9c47361630448f11aa9d677742bfa5f0c5a847a8f062770"
+  },
+  "timestamps": {
+    "createdAt": "2026-01-26T00:05:37+09:00",
+    "updatedAt": "2026-01-26T00:16:33+09:00"
+  }
+}

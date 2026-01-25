@@ -187,10 +187,10 @@ vdev new <name> [--force]
 2. 今日の日付（JST）をプレフィックスに付与
 3. docs/plans/<topic>/ ディレクトリを作成
 4. meta.json を初期状態で作成
-5. グローバル正本（~/.vdev/CLAUDE.md）から repo の CLAUDE.md を同期
+5. ai-resources から repo の CLAUDE.md およびその他資産を同期（vdev sync と同等）
    - --force なし: 差分があれば同期のみ失敗（topic は作成済み）、exit 1
    - --force あり: 差分があっても上書き、exit 0
-   - グローバル正本が存在しない場合: topic は作成済み、同期失敗、exit 1
+   - 同期元が存在しない場合: topic は作成済み、同期失敗、exit 1
 
 初期状態：
 - schemaVersion: 2
@@ -395,12 +395,12 @@ Broken Topic：
 
 ### 9.11 vdev sync
 
-repo の CLAUDE.md をグローバル正本に同期する。
+ai-resources から各種資産を repo に同期する。
 
 vdev sync [--force]
 
 動作：
-1. ~/.vdev/CLAUDE.md（グローバル正本）を読み取る
+1. ai-resources 配下の資産を読み取る
 2. 自動生成ヘッダ付きで repo 用 CLAUDE.md を生成
 3. 差分判定を行う（Last synced 行は比較対象から除外）
 
@@ -470,10 +470,8 @@ vdev は LLM 実行時の共通指示文として CLAUDE.md を利用する。
 
 ### 14.1 Source of Truth
 
-- CLAUDE.md の唯一の正（Source of Truth）は以下とする：
-
-  ~/.vdev/CLAUDE.md
-
+- CLAUDE.md の唯一の正（Source of Truth）は ai-resources リポジトリ内に存在する。
+- vdev sync により各リポジトリへ同期される。
 - このファイルは vdev フロー全体に共通な方針のみを記載し、
   リポジトリ固有のルールは含めない。
 
