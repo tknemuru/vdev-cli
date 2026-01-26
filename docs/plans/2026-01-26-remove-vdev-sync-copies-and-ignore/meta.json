@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "topic": "2026-01-26-remove-vdev-sync-copies-and-ignore",
+  "title": "Remove Vdev Sync Copies And Ignore",
+  "status": "DONE",
+  "paths": {
+    "instruction": "instruction.md",
+    "plan": "plan.md",
+    "designReview": "design-review.md",
+    "impl": "impl.md",
+    "implReview": "impl-review.md"
+  },
+  "hashes": {
+    "planSha256": "b998e2102802b4eae01396cab1efde26938be2e9c2da4bf6e9a42462038ecbf7",
+    "designReviewSha256": "a0c9086c9be07903ef2d5b2c5332666893bea421d7390e06adab3bbf08cf8784",
+    "implSha256": "d2379bf736030358c723dd30dab141024e3ca190aecf84938f96e10ceb167e63",
+    "implReviewSha256": "4bb73d627861cd03fde506272a353cf493f01d03ffa43325ef0e7c957dc8dd3f"
+  },
+  "timestamps": {
+    "createdAt": "2026-01-26T23:45:37+09:00",
+    "updatedAt": "2026-01-26T23:54:32+09:00"
+  }
+}

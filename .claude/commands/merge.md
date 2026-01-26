@@ -1,1 +1,0 @@
-commit/pushして、mainブランチにマージして。
