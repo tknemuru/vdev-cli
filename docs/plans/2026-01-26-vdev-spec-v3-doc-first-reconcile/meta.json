@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "topic": "2026-01-26-vdev-spec-v3-doc-first-reconcile",
+  "title": "Vdev Spec V3 Doc First Reconcile",
+  "status": "DONE",
+  "paths": {
+    "instruction": "instruction.md",
+    "plan": "plan.md",
+    "designReview": "design-review.md",
+    "impl": "impl.md",
+    "implReview": "impl-review.md"
+  },
+  "hashes": {
+    "planSha256": "49ebdc9a353182d5742998fb4474b16aa495bb9d23db6ddcdd8704d4839a9e80",
+    "designReviewSha256": "4af4a3b53299ac45dcb1d84f62346c33e628ffe718a9ecbc6ad01643fdcc7ee0",
+    "implSha256": "effbd5277e2a75fd93bbe1a93d1098bf6966d644e441b89655f7d4b38bfebf85",
+    "implReviewSha256": "2076289bcb506ddd04de0ca9cc7171dae6f3ff68eebc681c745ce96ba1603105"
+  },
+  "timestamps": {
+    "createdAt": "2026-01-26T10:23:08+09:00",
+    "updatedAt": "2026-01-26T10:38:12+09:00"
+  }
+}

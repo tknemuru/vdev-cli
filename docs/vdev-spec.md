@@ -1,6 +1,6 @@
 # vdev CLI 仕様書
 
-version: 2.0.0
+version: 3.0.0
 
 ## 1. 概要
 
@@ -18,12 +18,35 @@ DONE 状態のみを「完了」として扱う。
 - Topic は 1つの設計〜実装スレッド単位を表す
 - Topic は `docs/plans/YYYY-MM-DD-slug/` ディレクトリで表現される
 
-### 2.2 Source of Truth
-- 人間向け成果物：
-  - `instruction.md`, `plan.md`, `design-review.md`, `impl.md`, `impl-review.md`
-- 機械向け状態：
-  - `meta.json`
-- フローの状態判定は meta.json を唯一の正とする
+### 2.2 Source of Truth（v3.0 改訂）
+
+vdev におけるフロー状態の正（Canonical）は、以下の正本ファイル群から導出される。
+
+- instruction.md
+- plan.md
+- design-review.md
+- impl.md
+- impl-review.md
+
+meta.json は、これら正本ファイル群から導出された状態・メタデータを
+キャッシュとして保持する派生物であり、唯一の正ではない。
+
+vdev gate は、正本ファイル群を読み取り、
+現在の状態を導出し、必要に応じて meta.json を同期更新する。
+
+### 2.3 meta.json の位置づけ（v3.0 新設）
+
+meta.json は以下の目的のための派生キャッシュである。
+
+- vdev gate 実行結果の保存
+- 状態表示の高速化
+- 監査・履歴補助（timestamps / hashes）
+
+meta.json の内容が正本ファイル群と不整合であっても、
+それ自体はエラーとはならない。
+
+vdev gate は、正本ファイル群から導出した結果をもって
+meta.json を上書き同期してよい
 
 ---
 
@@ -106,13 +129,25 @@ DONE 状態のみを「完了」として扱う。
 | title | string | 表示用タイトル |
 | status | string | 現在の状態 |
 | paths.* | string | 各ファイルの相対パス |
-| hashes.*Sha256 | string | 各 md の SHA256 ハッシュ |
+| hashes.*Sha256 | string \| null | 各 md の SHA256 ハッシュ（監査用） |
 | timestamps.createdAt | string | 作成日時（JST ISO 8601） |
 | timestamps.updatedAt | string | 更新日時（JST ISO 8601） |
 
+### 5.4 hashes フィールドの扱い（v3.0 改訂）
+
+hashes.*Sha256 は、正本ファイルの内容を記録するための
+監査・差分検知用メタデータである。
+
+hash 不一致はエラー条件ではない。
+
+vdev gate 実行時、存在する正本ファイルについては
+SHA256 を再計算し、meta.json の hashes を同期更新してよい。
+
+DONE / REJECTED 状態であっても例外は設けない。
+
 ---
 
-## 6. Status Enum（v2.0）
+## 6. Status Enum（v3.0）
 
 | 値 | 説明 |
 |----|------|
@@ -125,11 +160,25 @@ DONE 状態のみを「完了」として扱う。
 | NEEDS_IMPL_REVIEW | impl-review.md 待ち |
 | DONE | 実装レビュー承認済み（完了） |
 | REJECTED | 設計却下 |
-| BROKEN_STATE | meta.json 不正またはハッシュ不整合 |
+| BROKEN_STATE | meta.json パース不能または構造破損（致命的破損のみ） |
 
 ---
 
-## 7. Exit Code（v2.0）
+### 6.1 BROKEN_STATE（v3.0 改訂）
+
+BROKEN_STATE は、状態導出や同期が不可能な致命的破損を表す。
+
+以下の場合にのみ BROKEN_STATE とする。
+
+- meta.json がパース不能であり、再生成もできない
+- トピックディレクトリ構造が破損している等、復旧不能な状態
+
+正本ファイルと meta.json の不整合、
+または hash 不一致のみを理由に BROKEN_STATE としてはならない。
+
+---
+
+## 7. Exit Code（v3.0）
 
 | Code | 状態 | 説明 |
 |------|------|------|
@@ -142,39 +191,64 @@ DONE 状態のみを「完了」として扱う。
 | 15 | NEEDS_IMPL_REPORT | impl.md なし |
 | 16 | NEEDS_IMPL_REVIEW | impl-review.md なし |
 | 17 | REJECTED | 設計却下 |
-| 20 | BROKEN_STATE | 整合性エラー |
-| 1 | COMMAND_ERROR | 前提条件違反 / 入力不正 / 例外 |
+| 20 | BROKEN_STATE | 致命的破損（パース不能・構造破損） |
+| 1 | COMMAND_ERROR | 前提条件違反 / 入力不正 / Status 行不正 / 例外 |
 
 ---
 
-## 8. Gate Decision Table（v2.0）
+## 8. Gate Decision Logic（v3.0 改訂）
+
+vdev gate は、以下の手順で判定を行う。
+
+1. meta.json がパース不能な場合は BROKEN_STATE（exit 20）
+2. 正本ファイルの存在を確認し、欠落に応じて NEEDS_* を導出
+3. review ファイルが存在する場合、Status 行を解釈して状態を導出
+4. Status 行が規約外の場合は COMMAND_ERROR（exit 1）
+5. 導出した状態を結果として返し、可能な場合 meta.json を同期更新する
+
+### 8.1 Gate Decision Table（v3.0）
 
 優先度順に評価し、最初に該当した条件で判定を確定する。
 
 | 優先度 | 条件 | 判定状態 | Exit Code |
 |--------|------|----------|-----------|
-| 1 | meta.json 不正/パース失敗 | BROKEN_STATE | 20 |
-| 2 | status in (DONE, REJECTED) かつ hash 不一致 | BROKEN_STATE | 20 |
-| 3 | instruction.md なし | NEEDS_INSTRUCTION | 10 |
-| 4 | plan.md なし | NEEDS_PLAN | 11 |
-| 5 | design-review.md なし | NEEDS_DESIGN_REVIEW | 12 |
-| 6 | status=REJECTED | REJECTED | 17 |
-| 7 | status=DESIGN_APPROVED | DESIGN_APPROVED | 13 |
-| 8 | status=IMPLEMENTING かつ impl.md なし | NEEDS_IMPL_REPORT | 15 |
-| 9 | status=IMPLEMENTING かつ impl.md あり かつ impl-review.md なし | NEEDS_IMPL_REVIEW | 16 |
-| 10 | status=NEEDS_IMPL_REVIEW | NEEDS_IMPL_REVIEW | 16 |
-| 11 | status=DONE かつ hash 一致 | DONE | 0 |
-| 12 | その他 | BROKEN_STATE | 20 |
+| 1 | meta.json パース不能 | BROKEN_STATE | 20 |
+| 2 | instruction.md なし | NEEDS_INSTRUCTION | 10 |
+| 3 | plan.md なし | NEEDS_PLAN | 11 |
+| 4 | design-review.md なし | NEEDS_DESIGN_REVIEW | 12 |
+| 5 | design-review.md の Status 行が規約外 | COMMAND_ERROR | 1 |
+| 6 | design-review.md に Status: REJECTED | REJECTED | 17 |
+| 7 | design-review.md に Status: NEEDS_CHANGES | NEEDS_PLAN | 11 |
+| 8 | design-review.md に Status: DESIGN_APPROVED かつ status=IMPLEMENTING | IMPLEMENTING | 14 |
+| 9 | design-review.md に Status: DESIGN_APPROVED かつ status≠IMPLEMENTING | DESIGN_APPROVED | 13 |
+| 10 | impl.md なし（status=IMPLEMENTING） | NEEDS_IMPL_REPORT | 15 |
+| 11 | impl-review.md なし | NEEDS_IMPL_REVIEW | 16 |
+| 12 | impl-review.md の Status 行が規約外 | COMMAND_ERROR | 1 |
+| 13 | impl-review.md に Status: NEEDS_CHANGES | IMPLEMENTING | 14 |
+| 14 | impl-review.md に Status: DONE | DONE | 0 |
 
-hash 一致条件：
-- planSha256 == SHA256(plan.md)
-- designReviewSha256 == SHA256(design-review.md)
-- implSha256 == SHA256(impl.md)
-- implReviewSha256 == SHA256(impl-review.md)
+### 8.2 Status 行の解釈とエラー（v3.0 新設）
+
+design-review.md および impl-review.md に記載された Status 行は、
+vdev が状態を導出するための入力である。
+
+Status 行が規定の値・形式に一致せず、
+状態を導出できない場合は以下とする。
+
+- vdev gate は COMMAND_ERROR（exit code: 1）を返す
+- この場合、状態遷移および meta.json 更新は行わない
+
+### 8.3 NEEDS_CHANGES の扱い（v3.0 明文化）
+
+- design-review.md に Status: NEEDS_CHANGES がある場合
+  - 状態は NEEDS_PLAN に戻る
+
+- impl-review.md に Status: NEEDS_CHANGES がある場合
+  - 状態は IMPLEMENTING に戻る
 
 ---
 
-## 9. Commands（v2.0）
+## 9. Commands（v3.0）
 
 ### 9.1 vdev new
 
@@ -446,13 +520,13 @@ ERROR: <message>
 
 ---
 
-## 12. Invariants（不変条件）
+## 12. Invariants（不変条件・v3.0 改訂）
 
 1. plan 更新は必ず NEEDS_DESIGN_REVIEW に戻す（再設計レビュー必須）
-2. DESIGN_APPROVED は design-review hash 整合が必須
-3. DONE は impl-review hash 整合が必須
-4. 全ての日時は JST（+09:00）で記録される
-5. 前提条件違反は状態遷移しない（COMMAND_ERROR）
+2. 全ての日時は JST（+09:00）で記録される
+3. 前提条件違反は状態遷移しない（COMMAND_ERROR）
+4. 正本ファイル群が状態の正であり、meta.json は派生キャッシュである
+5. vdev gate は正本から状態を導出し、meta.json を同期更新する
 
 ---
 
