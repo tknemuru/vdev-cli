@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "topic": "2026-01-26-chatgpt-claude-manifest-refactor",
+  "title": "Chatgpt Claude Manifest Refactor",
+  "status": "DONE",
+  "paths": {
+    "instruction": "instruction.md",
+    "plan": "plan.md",
+    "designReview": "design-review.md",
+    "impl": "impl.md",
+    "implReview": "impl-review.md"
+  },
+  "hashes": {
+    "planSha256": "aa1f1ee86974a5ba3f7841e6040b188401daf11a4838d2ab128addc976b910a6",
+    "designReviewSha256": "adf0e29ecd653084c155bbecd513222e5068d7715eb72f0f5c1f83b6df1f8316",
+    "implSha256": "47dd592786e52c39d48c819543462551005c094181bdd8ee3326c65896b6878d",
+    "implReviewSha256": "d161ffd7f64fadf291b8ee6bb79ff0e1851597c397ebeb7086496cb4bcb28114"
+  },
+  "timestamps": {
+    "createdAt": "2026-01-26T15:58:05+09:00",
+    "updatedAt": "2026-01-26T16:49:39+09:00"
+  }
+}

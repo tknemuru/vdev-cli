@@ -1,0 +1,24 @@
+# ChatGPT (MyGPT/GPTs) 手動設定マニフェスト
+#
+# ChatGPT/MyGPT に必要な手動設定を定義する。
+# claude.manifest.yaml とは異なり、`vdev sync` の配布対象ではない。
+# 人手で ChatGPT UI に設定する際の SoT として使用する。
+
+version: "1.0"
+
+# システムインストラクション
+# ChatGPT の「Instructions」フィールドに貼り付ける内容。
+system_instruction:
+  source: adapters/chatgpt/system-instruction.md
+  description: ChatGPT(MyGPT) のシステムインストラクション
+
+# ナレッジアップロード
+# ChatGPT UI で「Knowledge」としてアップロードするファイル。
+# 必須ドキュメントのみに最小化する。
+knowledge_uploads:
+  - source: docs/flow/vdev-flow.md
+    description: vdev フロー定義（SoT）
+
+# セットアップ手順
+# 1. `adapters/chatgpt/system-instruction.md` の内容を Instructions フィールドにコピー
+# 2. `docs/flow/vdev-flow.md` を Knowledge としてアップロード
