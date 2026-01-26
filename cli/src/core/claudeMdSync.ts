@@ -503,21 +503,14 @@ export function syncClaudeSubagents(repoRoot: string, force: boolean): DirSyncRe
 
 // knowledges sync functions
 
-/**
- * Knowledges are now synced from system/docs/ based on claude.manifest.yaml.
- * For simplicity, we use a hardcoded allowlist matching the manifest.
- */
-const KNOWLEDGES_ALLOWLIST = [
-  { source: 'docs/flow/vdev-flow.md', target: 'vdev-flow.md' },
-  { source: 'docs/rules/vdev-runtime-rules.md', target: 'vdev-runtime-rules.md' },
-  { source: 'docs/formats/claude-output-format.md', target: 'claude-output-format.md' },
-];
+import { getKnowledgesAllowlist, KnowledgesAllowlistItem } from './manifest';
 
 export interface KnowledgesSyncResult {
   success: boolean;
   written: boolean;
   hasDiff: boolean;
   manifestMissing: boolean;
+  manifestParseError: boolean;
   missingFiles: string[];
   message: string;
 }
@@ -525,9 +518,67 @@ export interface KnowledgesSyncResult {
 export function syncKnowledges(repoRoot: string, force: boolean): KnowledgesSyncResult {
   const systemBase = getSystemBasePath();
 
+  // Get allowlist from manifest
+  const allowlistResult = getKnowledgesAllowlist();
+
+  // Parse error: fail the sync (must not silently treat as empty)
+  if (allowlistResult.error) {
+    return {
+      success: false,
+      written: false,
+      hasDiff: false,
+      manifestMissing: false,
+      manifestParseError: true,
+      missingFiles: [],
+      message: allowlistResult.error,
+    };
+  }
+
+  const allowlist = allowlistResult.allowlist;
+
+  // Empty allowlist (file not found or key missing) with warning
+  // This is acceptable for backward compatibility
+  if (allowlist.length === 0) {
+    // If there's a warning, log it but continue with empty sync
+    const destDir = join(repoRoot, '.claude', 'knowledges');
+    const destExists = existsSync(destDir);
+
+    // If dest exists and has files, we need to clean it up
+    if (destExists && force) {
+      const destFiles = readdirSync(destDir);
+      if (destFiles.length > 0) {
+        rmSync(destDir, { recursive: true });
+        mkdirSync(destDir, { recursive: true });
+        return {
+          success: true,
+          written: true,
+          hasDiff: true,
+          manifestMissing: allowlistResult.warning?.includes('not found') ?? false,
+          manifestParseError: false,
+          missingFiles: [],
+          message: allowlistResult.warning
+            ? `.claude/knowledges cleared (${allowlistResult.warning})`
+            : '.claude/knowledges cleared (empty allowlist)',
+        };
+      }
+    }
+
+    return {
+      success: true,
+      written: false,
+      hasDiff: false,
+      manifestMissing: allowlistResult.warning?.includes('not found') ?? false,
+      manifestParseError: false,
+      missingFiles: [],
+      message: allowlistResult.warning
+        ? `.claude/knowledges skipped (${allowlistResult.warning})`
+        : '.claude/knowledges skipped (empty allowlist)',
+    };
+  }
+
   // Check all files in allowlist exist
   const missingFiles: string[] = [];
-  for (const item of KNOWLEDGES_ALLOWLIST) {
+  for (const item of allowlist) {
     const srcPath = join(systemBase, item.source);
     if (!existsSync(srcPath)) {
       missingFiles.push(item.source);
@@ -540,6 +591,7 @@ export function syncKnowledges(repoRoot: string, force: boolean): KnowledgesSync
       written: false,
       hasDiff: false,
       manifestMissing: false,
+      manifestParseError: false,
       missingFiles,
       message: `Missing files in system/: ${missingFiles.join(', ')}`,
     };
@@ -552,7 +604,7 @@ export function syncKnowledges(repoRoot: string, force: boolean): KnowledgesSync
   let hasDiff = !destExists;
   if (!hasDiff) {
     // Check if allowlist files differ from dest
-    for (const item of KNOWLEDGES_ALLOWLIST) {
+    for (const item of allowlist) {
       const srcPath = join(systemBase, item.source);
       const destPath = join(destDir, item.target);
       if (!existsSync(destPath)) {
@@ -568,7 +620,7 @@ export function syncKnowledges(repoRoot: string, force: boolean): KnowledgesSync
     }
     // Also check if dest has extra files not in allowlist
     if (!hasDiff) {
-      const allowedTargets = KNOWLEDGES_ALLOWLIST.map((i) => i.target);
+      const allowedTargets = allowlist.map((i: KnowledgesAllowlistItem) => i.target);
       const destFiles = readdirSync(destDir);
       for (const file of destFiles) {
         if (!allowedTargets.includes(file)) {
@@ -585,6 +637,7 @@ export function syncKnowledges(repoRoot: string, force: boolean): KnowledgesSync
       written: false,
       hasDiff: false,
       manifestMissing: false,
+      manifestParseError: false,
       missingFiles: [],
       message: '.claude/knowledges is up to date',
     };
@@ -598,7 +651,7 @@ export function syncKnowledges(repoRoot: string, force: boolean): KnowledgesSync
     mkdirSync(destDir, { recursive: true });
 
     // Copy only files in allowlist
-    for (const item of KNOWLEDGES_ALLOWLIST) {
+    for (const item of allowlist) {
       const srcPath = join(systemBase, item.source);
       const destPath = join(destDir, item.target);
       copyFileSync(srcPath, destPath);
@@ -609,6 +662,7 @@ export function syncKnowledges(repoRoot: string, force: boolean): KnowledgesSync
       written: true,
       hasDiff: true,
       manifestMissing: false,
+      manifestParseError: false,
       missingFiles: [],
       message: !destExists
         ? '.claude/knowledges created'
@@ -621,6 +675,7 @@ export function syncKnowledges(repoRoot: string, force: boolean): KnowledgesSync
     written: false,
     hasDiff: true,
     manifestMissing: false,
+    manifestParseError: false,
     missingFiles: [],
     message: '.claude/knowledges differs from source',
   };

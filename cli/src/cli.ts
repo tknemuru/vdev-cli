@@ -91,14 +91,19 @@ program
       }
       // Warning: .claude/knowledges issues
       if (result.knowledgesResult && !result.knowledgesResult.success) {
-        if (result.knowledgesResult.manifestMissing) {
-          // No longer uses manifest - this shouldn't happen
+        if (result.knowledgesResult.manifestParseError) {
+          // Manifest parse error is a hard error
           console.error(
-            'Warning: knowledges source files missing in system/docs/'
+            `Error: ${result.knowledgesResult.message}`
+          );
+        } else if (result.knowledgesResult.manifestMissing) {
+          // Manifest file not found (warning only for backward compatibility)
+          console.error(
+            `Warning: ${result.knowledgesResult.message}`
           );
         } else if (result.knowledgesResult.missingFiles.length > 0) {
           console.error(
-            `Warning: Missing files in system/docs/: ${result.knowledgesResult.missingFiles.join(', ')}`
+            `Warning: Missing files in system/: ${result.knowledgesResult.missingFiles.join(', ')}`
           );
         } else if (result.knowledgesResult.hasDiff) {
           console.error('Warning: .claude/knowledges differs from source');
@@ -296,14 +301,19 @@ program
     }
     // Warning: .claude/knowledges issues
     if (result.knowledgesResult && !result.knowledgesResult.success) {
-      if (result.knowledgesResult.manifestMissing) {
-        // No longer uses manifest
+      if (result.knowledgesResult.manifestParseError) {
+        // Manifest parse error is a hard error
         console.error(
-          'Warning: knowledges source files missing in system/docs/'
+          `Error: ${result.knowledgesResult.message}`
+        );
+      } else if (result.knowledgesResult.manifestMissing) {
+        // Manifest file not found (warning only for backward compatibility)
+        console.error(
+          `Warning: ${result.knowledgesResult.message}`
         );
       } else if (result.knowledgesResult.missingFiles.length > 0) {
         console.error(
-          `Warning: Missing files in system/docs/: ${result.knowledgesResult.missingFiles.join(', ')}`
+          `Warning: Missing files in system/: ${result.knowledgesResult.missingFiles.join(', ')}`
         );
       } else if (result.knowledgesResult.hasDiff) {
         console.error('Warning: .claude/knowledges differs from source');

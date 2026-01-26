@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "topic": "2026-01-27-manifest-driven-vdev-sync",
+  "title": "Manifest Driven Vdev Sync",
+  "status": "NEEDS_IMPL_REVIEW",
+  "paths": {
+    "instruction": "instruction.md",
+    "plan": "plan.md",
+    "designReview": "design-review.md",
+    "impl": "impl.md",
+    "implReview": "impl-review.md"
+  },
+  "hashes": {
+    "planSha256": "da6099db4403315790d4df72be0592cf6669ba9177a2e9e67f3bde8ac5dcc91a",
+    "designReviewSha256": "9fbc5dd6a852364289b097f5e6e8d4fe727ea36dccd7fa7db7c33137f8eba3c9",
+    "implSha256": "d78800211f29379fa5f59f9270310ad6fd2bc14cbacdf47852bf2b8e2cb3173d",
+    "implReviewSha256": null
+  },
+  "timestamps": {
+    "createdAt": "2026-01-27T00:29:03+09:00",
+    "updatedAt": "2026-01-27T00:44:40+09:00"
+  }
+}
