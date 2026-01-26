@@ -544,7 +544,7 @@ vdev は LLM 実行時の共通指示文として CLAUDE.md を利用する。
 
 ### 14.1 Source of Truth
 
-- CLAUDE.md の唯一の正（Source of Truth）は ai-resources リポジトリ内に存在する。
+- CLAUDE.md の唯一の正（Source of Truth）はモノリポ内 system/adapters/claude/CLAUDE.md に存在する。
 - vdev sync により各リポジトリへ同期される。
 - このファイルは vdev フロー全体に共通な方針のみを記載し、
   リポジトリ固有のルールは含めない。
