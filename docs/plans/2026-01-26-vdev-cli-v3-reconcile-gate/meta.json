@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "topic": "2026-01-26-vdev-cli-v3-reconcile-gate",
+  "title": "Vdev Cli V3 Reconcile Gate",
+  "status": "DONE",
+  "paths": {
+    "instruction": "instruction.md",
+    "plan": "plan.md",
+    "designReview": "design-review.md",
+    "impl": "impl.md",
+    "implReview": "impl-review.md"
+  },
+  "hashes": {
+    "planSha256": "4ee5c312e265431b92f0103a7aa0cf3e9b76d131d7578510bada949847e3c805",
+    "designReviewSha256": "b8dcc6ddee0ac022d8b75604d12c33cce21efde4dd6b488946d8de9ff6385c44",
+    "implSha256": "c036985604589ffb48afdf771c838ddcf99f2f8ccb62a5164f612e0e11180fbb",
+    "implReviewSha256": "40c447d87c47c0ab5febfeb2a93a0a2c3ba8dc4013ba4a6f9008a6c6f8e3da61"
+  },
+  "timestamps": {
+    "createdAt": "2026-01-26T11:59:56+09:00",
+    "updatedAt": "2026-01-26T12:08:42+09:00"
+  }
+}
