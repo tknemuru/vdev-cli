@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "topic": "2026-01-26-vdev-monorepo-system-registry",
+  "title": "Vdev Monorepo System Registry",
+  "status": "DONE",
+  "paths": {
+    "instruction": "instruction.md",
+    "plan": "plan.md",
+    "designReview": "design-review.md",
+    "impl": "impl.md",
+    "implReview": "impl-review.md"
+  },
+  "hashes": {
+    "planSha256": "6e5fce748b5916f958a09608e41423128e790149073fd1aab7821c4d8485259e",
+    "designReviewSha256": "c6a0f9094600f7962e1923fef3eb9ba0ce6ecb6134d2724f41c24954128d28cc",
+    "implSha256": "cbb206445da83321496ff68fd11d0a98eecfb5c7b30d3598aba9714330abf848",
+    "implReviewSha256": "ddad6e484ac5f50b8100b3aa340275b1f1219f5eba59ad29ffb91d1bc2068c9b"
+  },
+  "timestamps": {
+    "createdAt": "2026-01-26T13:54:17+09:00",
+    "updatedAt": "2026-01-26T14:26:28+09:00"
+  }
+}

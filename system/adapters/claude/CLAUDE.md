@@ -1,7 +1,3 @@
-<!-- AUTO-GENERATED FILE - DO NOT EDIT -->
-<!-- Source: system/adapters/claude/CLAUDE.md -->
-<!-- Last synced: 2026-01-26T14:20:52+09:00 -->
-
 # vdev 前提実装規約（Claude Code 用・永続）
 
 本ドキュメントは、Claude Code が **vdev フロー前提**で実装を行うための

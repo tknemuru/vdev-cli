@@ -1,0 +1,40 @@
+# Claude Code Distribution Manifest
+#
+# Defines files to distribute via `vdev sync` and `vdev new`
+# Source: system/ (monorepo)
+# Destination: Target repository
+
+version: "1.0"
+
+# Main CLAUDE.md distribution
+main:
+  source: adapters/claude/CLAUDE.md
+  dest: CLAUDE.md
+  description: Claude Code 用実装規約
+
+# vdev-flow.md distribution
+flow:
+  source: docs/flow/vdev-flow.md
+  dest: vdev-flow.md
+  description: vdev フロー定義
+
+# .claude/ directory distribution
+claude_dir:
+  source: adapters/claude/
+  dest: .claude/
+  exclude:
+    - CLAUDE.md  # Handled separately as main
+    - reviewer-principles.md  # Handled separately
+  description: Claude Code 設定ディレクトリ
+
+# Knowledges distribution (allowlist)
+knowledges:
+  dest: .claude/knowledges/
+  allowlist:
+    - source: docs/flow/vdev-flow.md
+      target: vdev-flow.md
+    - source: docs/rules/vdev-runtime-rules.md
+      target: vdev-runtime-rules.md
+    - source: docs/formats/claude-output-format.md
+      target: claude-output-format.md
+  description: Claude Code knowledge ファイル（allowlist 方式）

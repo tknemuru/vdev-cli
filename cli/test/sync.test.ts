@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync, existsSync, writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
 import {
   getGlobalClaudeMdPath,
-  getAiResourcesBasePath,
+  getSystemBasePath,
   readGlobalClaudeMd,
   renderRepoClaudeMd,
   differs,
@@ -14,9 +13,6 @@ import {
   syncClaudeCommands,
   syncClaudeSubagents,
   syncKnowledges,
-  getKnowledgeManifestPath,
-  readKnowledgeManifest,
-  getKnowledgesSourceDir,
 } from '../src/core/claudeMdSync';
 import { newPlan } from '../src/commands/new';
 import { syncCommand } from '../src/commands/sync';
@@ -24,37 +20,34 @@ import { getPlansDir, getTopicDir } from '../src/core/paths';
 
 const TEST_TOPIC_PREFIX = 'test-sync-';
 
-// ai-resources paths
-const AI_RESOURCES_BASE = join(homedir(), 'projects', 'ai-resources', 'vibe-coding-partner');
-const AI_RESOURCES_CLAUDE_DIR = join(AI_RESOURCES_BASE, 'claude');
-const AI_RESOURCES_KNOWLEDGES_DIR = join(AI_RESOURCES_BASE, 'knowledges');
+// System paths (monorepo structure)
+// __dirname is cli/test/ (in source), cli/dist/test/ (after compile, though vitest uses source)
+// getSystemBasePath() returns <repo-root>/system/
+const SYSTEM_BASE = getSystemBasePath();
+const SYSTEM_ADAPTERS_CLAUDE = join(SYSTEM_BASE, 'adapters', 'claude');
+const SYSTEM_DOCS = join(SYSTEM_BASE, 'docs');
 
-// Backup state for ai-resources
-let aiResourcesExisted = false;
+// Backup state for system/
+let systemExisted = false;
 let originalClaudeMd: string | null = null;
 let originalVdevFlow: string | null = null;
 let originalCommands: Map<string, string> = new Map();
 let originalSubagents: Map<string, string> = new Map();
-let originalKnowledges: Map<string, string> = new Map();
-let originalManifest: string | null = null;
+let originalKnowledges: Map<string, { path: string; content: string }[]> = new Map();
 let originalClaudeDirFiles: Map<string, string> = new Map();
 
-function backupAiResources() {
-  aiResourcesExisted = existsSync(AI_RESOURCES_BASE);
-  if (aiResourcesExisted) {
-    const claudeMdPath = join(AI_RESOURCES_CLAUDE_DIR, 'CLAUDE.md');
+function backupSystem() {
+  systemExisted = existsSync(SYSTEM_BASE);
+  if (systemExisted) {
+    const claudeMdPath = join(SYSTEM_ADAPTERS_CLAUDE, 'CLAUDE.md');
     if (existsSync(claudeMdPath)) {
       originalClaudeMd = readFileSync(claudeMdPath, 'utf8');
     }
-    const vdevFlowPath = join(AI_RESOURCES_KNOWLEDGES_DIR, 'vdev-flow.md');
+    const vdevFlowPath = join(SYSTEM_DOCS, 'flow', 'vdev-flow.md');
     if (existsSync(vdevFlowPath)) {
       originalVdevFlow = readFileSync(vdevFlowPath, 'utf8');
     }
-    const manifestPath = join(AI_RESOURCES_CLAUDE_DIR, 'knowledge-manifest.txt');
-    if (existsSync(manifestPath)) {
-      originalManifest = readFileSync(manifestPath, 'utf8');
-    }
-    const commandsDir = join(AI_RESOURCES_CLAUDE_DIR, 'commands');
+    const commandsDir = join(SYSTEM_ADAPTERS_CLAUDE, 'commands');
     if (existsSync(commandsDir)) {
       const files = require('fs').readdirSync(commandsDir);
       for (const file of files) {
@@ -64,7 +57,7 @@ function backupAiResources() {
         }
       }
     }
-    const subagentsDir = join(AI_RESOURCES_CLAUDE_DIR, 'subagents');
+    const subagentsDir = join(SYSTEM_ADAPTERS_CLAUDE, 'subagents');
     if (existsSync(subagentsDir)) {
       const files = require('fs').readdirSync(subagentsDir);
       for (const file of files) {
@@ -74,22 +67,27 @@ function backupAiResources() {
         }
       }
     }
-    if (existsSync(AI_RESOURCES_KNOWLEDGES_DIR)) {
-      const files = require('fs').readdirSync(AI_RESOURCES_KNOWLEDGES_DIR);
-      for (const file of files) {
-        const stat = require('fs').statSync(join(AI_RESOURCES_KNOWLEDGES_DIR, file));
-        if (stat.isFile()) {
-          originalKnowledges.set(file, readFileSync(join(AI_RESOURCES_KNOWLEDGES_DIR, file), 'utf8'));
-        }
+    // Backup knowledges from system/docs/
+    const knowledgeFiles = [
+      { source: 'docs/flow/vdev-flow.md', target: 'vdev-flow.md' },
+      { source: 'docs/rules/vdev-runtime-rules.md', target: 'vdev-runtime-rules.md' },
+      { source: 'docs/formats/claude-output-format.md', target: 'claude-output-format.md' },
+    ];
+    for (const item of knowledgeFiles) {
+      const srcPath = join(SYSTEM_BASE, item.source);
+      if (existsSync(srcPath)) {
+        const existing = originalKnowledges.get('knowledges') || [];
+        existing.push({ path: item.source, content: readFileSync(srcPath, 'utf8') });
+        originalKnowledges.set('knowledges', existing);
       }
     }
     // Backup claude dir root files (e.g., reviewer-principles.md)
-    if (existsSync(AI_RESOURCES_CLAUDE_DIR)) {
-      const files = require('fs').readdirSync(AI_RESOURCES_CLAUDE_DIR);
+    if (existsSync(SYSTEM_ADAPTERS_CLAUDE)) {
+      const files = require('fs').readdirSync(SYSTEM_ADAPTERS_CLAUDE);
       for (const file of files) {
-        const filePath = join(AI_RESOURCES_CLAUDE_DIR, file);
+        const filePath = join(SYSTEM_ADAPTERS_CLAUDE, file);
         const stat = require('fs').statSync(filePath);
-        if (stat.isFile() && file !== 'CLAUDE.md' && file !== 'knowledge-manifest.txt') {
+        if (stat.isFile() && file !== 'CLAUDE.md') {
           originalClaudeDirFiles.set(file, readFileSync(filePath, 'utf8'));
         }
       }
@@ -97,33 +95,23 @@ function backupAiResources() {
   }
 }
 
-function restoreAiResources() {
+function restoreSystem() {
   // Restore CLAUDE.md
-  const claudeMdPath = join(AI_RESOURCES_CLAUDE_DIR, 'CLAUDE.md');
+  const claudeMdPath = join(SYSTEM_ADAPTERS_CLAUDE, 'CLAUDE.md');
   if (originalClaudeMd !== null) {
-    mkdirSync(AI_RESOURCES_CLAUDE_DIR, { recursive: true });
+    mkdirSync(SYSTEM_ADAPTERS_CLAUDE, { recursive: true });
     writeFileSync(claudeMdPath, originalClaudeMd, 'utf8');
-  } else if (!aiResourcesExisted && existsSync(claudeMdPath)) {
-    rmSync(claudeMdPath);
   }
 
   // Restore vdev-flow.md
-  const vdevFlowPath = join(AI_RESOURCES_KNOWLEDGES_DIR, 'vdev-flow.md');
+  const vdevFlowPath = join(SYSTEM_DOCS, 'flow', 'vdev-flow.md');
   if (originalVdevFlow !== null) {
-    mkdirSync(AI_RESOURCES_KNOWLEDGES_DIR, { recursive: true });
+    mkdirSync(join(SYSTEM_DOCS, 'flow'), { recursive: true });
     writeFileSync(vdevFlowPath, originalVdevFlow, 'utf8');
   }
 
-  // Restore manifest
-  const manifestPath = join(AI_RESOURCES_CLAUDE_DIR, 'knowledge-manifest.txt');
-  if (originalManifest !== null) {
-    writeFileSync(manifestPath, originalManifest, 'utf8');
-  } else if (!aiResourcesExisted && existsSync(manifestPath)) {
-    rmSync(manifestPath);
-  }
-
   // Restore commands
-  const commandsDir = join(AI_RESOURCES_CLAUDE_DIR, 'commands');
+  const commandsDir = join(SYSTEM_ADAPTERS_CLAUDE, 'commands');
   if (originalCommands.size > 0) {
     if (existsSync(commandsDir)) {
       rmSync(commandsDir, { recursive: true });
@@ -132,12 +120,10 @@ function restoreAiResources() {
     for (const [file, content] of originalCommands) {
       writeFileSync(join(commandsDir, file), content, 'utf8');
     }
-  } else if (!aiResourcesExisted && existsSync(commandsDir)) {
-    rmSync(commandsDir, { recursive: true });
   }
 
   // Restore subagents
-  const subagentsDir = join(AI_RESOURCES_CLAUDE_DIR, 'subagents');
+  const subagentsDir = join(SYSTEM_ADAPTERS_CLAUDE, 'subagents');
   if (originalSubagents.size > 0) {
     if (existsSync(subagentsDir)) {
       rmSync(subagentsDir, { recursive: true });
@@ -146,28 +132,26 @@ function restoreAiResources() {
     for (const [file, content] of originalSubagents) {
       writeFileSync(join(subagentsDir, file), content, 'utf8');
     }
-  } else if (!aiResourcesExisted && existsSync(subagentsDir)) {
-    rmSync(subagentsDir, { recursive: true });
   }
 
   // Restore knowledges
-  if (originalKnowledges.size > 0) {
-    for (const [file, content] of originalKnowledges) {
-      writeFileSync(join(AI_RESOURCES_KNOWLEDGES_DIR, file), content, 'utf8');
-    }
+  const knowledgeItems = originalKnowledges.get('knowledges') || [];
+  for (const item of knowledgeItems) {
+    const destPath = join(SYSTEM_BASE, item.path);
+    mkdirSync(require('path').dirname(destPath), { recursive: true });
+    writeFileSync(destPath, item.content, 'utf8');
   }
 
   // Restore claude dir root files
   if (originalClaudeDirFiles.size > 0) {
     for (const [file, content] of originalClaudeDirFiles) {
-      writeFileSync(join(AI_RESOURCES_CLAUDE_DIR, file), content, 'utf8');
+      writeFileSync(join(SYSTEM_ADAPTERS_CLAUDE, file), content, 'utf8');
     }
   }
 
   // Reset state
   originalClaudeMd = null;
   originalVdevFlow = null;
-  originalManifest = null;
   originalCommands = new Map();
   originalSubagents = new Map();
   originalKnowledges = new Map();
@@ -175,30 +159,30 @@ function restoreAiResources() {
 }
 
 function setGlobalClaudeMd(content: string) {
-  mkdirSync(AI_RESOURCES_CLAUDE_DIR, { recursive: true });
-  writeFileSync(join(AI_RESOURCES_CLAUDE_DIR, 'CLAUDE.md'), content, 'utf8');
+  mkdirSync(SYSTEM_ADAPTERS_CLAUDE, { recursive: true });
+  writeFileSync(join(SYSTEM_ADAPTERS_CLAUDE, 'CLAUDE.md'), content, 'utf8');
 }
 
 function removeGlobalClaudeMd() {
-  const path = join(AI_RESOURCES_CLAUDE_DIR, 'CLAUDE.md');
+  const path = join(SYSTEM_ADAPTERS_CLAUDE, 'CLAUDE.md');
   if (existsSync(path)) {
     rmSync(path);
   }
 }
 
-function setManifest(content: string) {
-  mkdirSync(AI_RESOURCES_CLAUDE_DIR, { recursive: true });
-  writeFileSync(join(AI_RESOURCES_CLAUDE_DIR, 'knowledge-manifest.txt'), content, 'utf8');
-}
-
 function setKnowledgeFile(filename: string, content: string) {
-  mkdirSync(AI_RESOURCES_KNOWLEDGES_DIR, { recursive: true });
-  writeFileSync(join(AI_RESOURCES_KNOWLEDGES_DIR, filename), content, 'utf8');
-}
-
-function setClaudeDirFile(filename: string, content: string) {
-  mkdirSync(AI_RESOURCES_CLAUDE_DIR, { recursive: true });
-  writeFileSync(join(AI_RESOURCES_CLAUDE_DIR, filename), content, 'utf8');
+  // Map target filename to source path
+  const mapping: Record<string, string> = {
+    'vdev-flow.md': 'docs/flow/vdev-flow.md',
+    'vdev-runtime-rules.md': 'docs/rules/vdev-runtime-rules.md',
+    'claude-output-format.md': 'docs/formats/claude-output-format.md',
+  };
+  const sourcePath = mapping[filename];
+  if (sourcePath) {
+    const fullPath = join(SYSTEM_BASE, sourcePath);
+    mkdirSync(require('path').dirname(fullPath), { recursive: true });
+    writeFileSync(fullPath, content, 'utf8');
+  }
 }
 
 function removeTopic(topic: string) {
@@ -210,23 +194,23 @@ function removeTopic(topic: string) {
 
 describe('claudeMdSync core functions', () => {
   beforeEach(() => {
-    backupAiResources();
+    backupSystem();
   });
 
   afterEach(() => {
-    restoreAiResources();
+    restoreSystem();
   });
 
-  it('getAiResourcesBasePath returns correct path', () => {
-    const path = getAiResourcesBasePath();
-    expect(path).toBe(join(homedir(), 'projects', 'ai-resources', 'vibe-coding-partner'));
+  it('getSystemBasePath returns correct path', () => {
+    const path = getSystemBasePath();
+    // Should end with 'system' and exist in monorepo
+    expect(path.endsWith('system')).toBe(true);
+    expect(existsSync(path)).toBe(true);
   });
 
   it('getGlobalClaudeMdPath returns correct path', () => {
     const path = getGlobalClaudeMdPath();
-    expect(path).toBe(
-      join(homedir(), 'projects', 'ai-resources', 'vibe-coding-partner', 'claude', 'CLAUDE.md')
-    );
+    expect(path).toBe(join(SYSTEM_BASE, 'adapters', 'claude', 'CLAUDE.md'));
   });
 
   it('readGlobalClaudeMd returns null when file does not exist', () => {
@@ -247,9 +231,7 @@ describe('claudeMdSync core functions', () => {
     const result = renderRepoClaudeMd(globalBody, nowIso);
 
     expect(result).toContain('<!-- AUTO-GENERATED FILE - DO NOT EDIT -->');
-    expect(result).toContain(
-      '<!-- Source: ~/projects/ai-resources/vibe-coding-partner/claude/CLAUDE.md -->'
-    );
+    expect(result).toContain('<!-- Source: system/adapters/claude/CLAUDE.md -->');
     expect(result).toContain('<!-- Last synced: 2026-01-20T10:00:00+09:00 -->');
     expect(result).toContain('# My Rules');
     expect(result).toContain('Some content.');
@@ -284,12 +266,12 @@ describe('syncClaudeMd', () => {
   const testRepoRoot = join(process.cwd(), 'test-repo-sync');
 
   beforeEach(() => {
-    backupAiResources();
+    backupSystem();
     mkdirSync(testRepoRoot, { recursive: true });
   });
 
   afterEach(() => {
-    restoreAiResources();
+    restoreSystem();
     if (existsSync(testRepoRoot)) {
       rmSync(testRepoRoot, { recursive: true });
     }
@@ -347,14 +329,14 @@ describe('newPlan with sync', () => {
   let createdTopics: string[] = [];
 
   beforeEach(() => {
-    backupAiResources();
+    backupSystem();
     createdTopics = [];
     const plansDir = getPlansDir();
     mkdirSync(plansDir, { recursive: true });
   });
 
   afterEach(() => {
-    restoreAiResources();
+    restoreSystem();
     for (const topic of createdTopics) {
       removeTopic(topic);
     }
@@ -385,15 +367,14 @@ describe('newPlan with sync', () => {
 
 describe('.claude directory sync', () => {
   const testRepoRoot = join(process.cwd(), 'test-repo-claude-dir');
-  const GLOBAL_CLAUDE_DIR = join(AI_RESOURCES_CLAUDE_DIR);
 
   beforeEach(() => {
-    backupAiResources();
+    backupSystem();
     mkdirSync(testRepoRoot, { recursive: true });
   });
 
   afterEach(() => {
-    restoreAiResources();
+    restoreSystem();
     if (existsSync(testRepoRoot)) {
       rmSync(testRepoRoot, { recursive: true });
     }
@@ -401,30 +382,51 @@ describe('.claude directory sync', () => {
 
   it('getGlobalClaudeDir returns correct path', () => {
     const path = getGlobalClaudeDir();
-    expect(path).toBe(join(homedir(), 'projects', 'ai-resources', 'vibe-coding-partner', 'claude'));
+    expect(path).toBe(join(SYSTEM_BASE, 'adapters', 'claude'));
   });
 
   // syncClaudeDir tests (new unified function)
 
   it('syncClaudeDir returns sourceMissing when source does not exist', () => {
-    // Ensure claude dir does not exist
-    if (existsSync(GLOBAL_CLAUDE_DIR)) {
-      rmSync(GLOBAL_CLAUDE_DIR, { recursive: true });
+    // Temporarily remove the claude dir
+    const claudeDir = SYSTEM_ADAPTERS_CLAUDE;
+    const tempBackup = claudeDir + '.bak';
+    if (existsSync(claudeDir)) {
+      require('fs').renameSync(claudeDir, tempBackup);
     }
-    const result = syncClaudeDir(testRepoRoot, false);
-    expect(result.success).toBe(false);
-    expect(result.sourceMissing).toBe(true);
+    try {
+      const result = syncClaudeDir(testRepoRoot, false);
+      expect(result.success).toBe(false);
+      expect(result.sourceMissing).toBe(true);
+    } finally {
+      // Restore
+      if (existsSync(tempBackup)) {
+        require('fs').renameSync(tempBackup, claudeDir);
+      }
+    }
   });
 
   it('syncClaudeDir copies entire directory excluding CLAUDE.md', () => {
     // Create source directory with multiple files/dirs
-    mkdirSync(GLOBAL_CLAUDE_DIR, { recursive: true });
-    writeFileSync(join(GLOBAL_CLAUDE_DIR, 'CLAUDE.md'), '# Should be excluded\n', 'utf8');
-    writeFileSync(join(GLOBAL_CLAUDE_DIR, 'reviewer-principles.md'), '# Reviewer Principles\n', 'utf8');
-    mkdirSync(join(GLOBAL_CLAUDE_DIR, 'commands'), { recursive: true });
-    writeFileSync(join(GLOBAL_CLAUDE_DIR, 'commands', 'test-cmd.md'), '# Test Command\n', 'utf8');
-    mkdirSync(join(GLOBAL_CLAUDE_DIR, 'subagents'), { recursive: true });
-    writeFileSync(join(GLOBAL_CLAUDE_DIR, 'subagents', 'test-agent.md'), '# Test Agent\n', 'utf8');
+    mkdirSync(SYSTEM_ADAPTERS_CLAUDE, { recursive: true });
+    writeFileSync(join(SYSTEM_ADAPTERS_CLAUDE, 'CLAUDE.md'), '# Should be excluded\n', 'utf8');
+    writeFileSync(
+      join(SYSTEM_ADAPTERS_CLAUDE, 'test-file.md'),
+      '# Test File\n',
+      'utf8'
+    );
+    mkdirSync(join(SYSTEM_ADAPTERS_CLAUDE, 'commands'), { recursive: true });
+    writeFileSync(
+      join(SYSTEM_ADAPTERS_CLAUDE, 'commands', 'test-cmd.md'),
+      '# Test Command\n',
+      'utf8'
+    );
+    mkdirSync(join(SYSTEM_ADAPTERS_CLAUDE, 'subagents'), { recursive: true });
+    writeFileSync(
+      join(SYSTEM_ADAPTERS_CLAUDE, 'subagents', 'test-agent.md'),
+      '# Test Agent\n',
+      'utf8'
+    );
 
     const result = syncClaudeDir(testRepoRoot, false);
     expect(result.success).toBe(true);
@@ -434,9 +436,9 @@ describe('.claude directory sync', () => {
     expect(existsSync(join(testRepoRoot, '.claude', 'CLAUDE.md'))).toBe(false);
 
     // Other files should be synced
-    expect(existsSync(join(testRepoRoot, '.claude', 'reviewer-principles.md'))).toBe(true);
-    expect(readFileSync(join(testRepoRoot, '.claude', 'reviewer-principles.md'), 'utf8')).toBe(
-      '# Reviewer Principles\n'
+    expect(existsSync(join(testRepoRoot, '.claude', 'test-file.md'))).toBe(true);
+    expect(readFileSync(join(testRepoRoot, '.claude', 'test-file.md'), 'utf8')).toBe(
+      '# Test File\n'
     );
     expect(existsSync(join(testRepoRoot, '.claude', 'commands', 'test-cmd.md'))).toBe(true);
     expect(existsSync(join(testRepoRoot, '.claude', 'subagents', 'test-agent.md'))).toBe(true);
@@ -444,11 +446,11 @@ describe('.claude directory sync', () => {
 
   it('syncClaudeDir syncs future files without code change', () => {
     // Create source directory with a "future" file
-    mkdirSync(GLOBAL_CLAUDE_DIR, { recursive: true });
-    writeFileSync(join(GLOBAL_CLAUDE_DIR, 'CLAUDE.md'), '# Excluded\n', 'utf8');
-    writeFileSync(join(GLOBAL_CLAUDE_DIR, 'future-feature.md'), '# Future Feature\n', 'utf8');
-    mkdirSync(join(GLOBAL_CLAUDE_DIR, 'new-dir'), { recursive: true });
-    writeFileSync(join(GLOBAL_CLAUDE_DIR, 'new-dir', 'nested.md'), '# Nested\n', 'utf8');
+    mkdirSync(SYSTEM_ADAPTERS_CLAUDE, { recursive: true });
+    writeFileSync(join(SYSTEM_ADAPTERS_CLAUDE, 'CLAUDE.md'), '# Excluded\n', 'utf8');
+    writeFileSync(join(SYSTEM_ADAPTERS_CLAUDE, 'future-feature.md'), '# Future Feature\n', 'utf8');
+    mkdirSync(join(SYSTEM_ADAPTERS_CLAUDE, 'new-dir'), { recursive: true });
+    writeFileSync(join(SYSTEM_ADAPTERS_CLAUDE, 'new-dir', 'nested.md'), '# Nested\n', 'utf8');
 
     const result = syncClaudeDir(testRepoRoot, false);
     expect(result.success).toBe(true);
@@ -460,9 +462,9 @@ describe('.claude directory sync', () => {
   });
 
   it('syncClaudeDir returns hasDiff=true, written=false when diff exists and force=false', () => {
-    // Create source directory
-    mkdirSync(GLOBAL_CLAUDE_DIR, { recursive: true });
-    writeFileSync(join(GLOBAL_CLAUDE_DIR, 'file.md'), '# New Content\n', 'utf8');
+    // Create source directory with minimal content
+    mkdirSync(SYSTEM_ADAPTERS_CLAUDE, { recursive: true });
+    writeFileSync(join(SYSTEM_ADAPTERS_CLAUDE, 'file.md'), '# New Content\n', 'utf8');
 
     // Create existing directory with different content
     const destDir = join(testRepoRoot, '.claude');
@@ -476,9 +478,9 @@ describe('.claude directory sync', () => {
   });
 
   it('syncClaudeDir overwrites when diff exists and force=true', () => {
-    // Create source directory
-    mkdirSync(GLOBAL_CLAUDE_DIR, { recursive: true });
-    writeFileSync(join(GLOBAL_CLAUDE_DIR, 'file.md'), '# New Content\n', 'utf8');
+    // Create source directory with minimal content
+    mkdirSync(SYSTEM_ADAPTERS_CLAUDE, { recursive: true });
+    writeFileSync(join(SYSTEM_ADAPTERS_CLAUDE, 'file.md'), '# New Content\n', 'utf8');
 
     // Create existing directory with different content
     const destDir = join(testRepoRoot, '.claude');
@@ -497,29 +499,42 @@ describe('.claude directory sync', () => {
 
   it('syncClaudeDir returns hasDiff=false when content is identical', () => {
     // Clear and recreate source directory with only our test file
-    if (existsSync(GLOBAL_CLAUDE_DIR)) {
-      rmSync(GLOBAL_CLAUDE_DIR, { recursive: true });
+    // First backup and remove existing content
+    const tempBackup = SYSTEM_ADAPTERS_CLAUDE + '.bak-identical-test';
+    if (existsSync(SYSTEM_ADAPTERS_CLAUDE)) {
+      require('fs').renameSync(SYSTEM_ADAPTERS_CLAUDE, tempBackup);
     }
-    mkdirSync(GLOBAL_CLAUDE_DIR, { recursive: true });
-    writeFileSync(join(GLOBAL_CLAUDE_DIR, 'file.md'), '# Same Content\n', 'utf8');
+    try {
+      mkdirSync(SYSTEM_ADAPTERS_CLAUDE, { recursive: true });
+      writeFileSync(join(SYSTEM_ADAPTERS_CLAUDE, 'file.md'), '# Same Content\n', 'utf8');
 
-    // Create existing directory with same content
-    const destDir = join(testRepoRoot, '.claude');
-    mkdirSync(destDir, { recursive: true });
-    writeFileSync(join(destDir, 'file.md'), '# Same Content\n', 'utf8');
+      // Create existing directory with same content
+      const destDir = join(testRepoRoot, '.claude');
+      mkdirSync(destDir, { recursive: true });
+      writeFileSync(join(destDir, 'file.md'), '# Same Content\n', 'utf8');
 
-    const result = syncClaudeDir(testRepoRoot, false);
-    expect(result.success).toBe(true);
-    expect(result.hasDiff).toBe(false);
-    expect(result.written).toBe(false);
+      const result = syncClaudeDir(testRepoRoot, false);
+      expect(result.success).toBe(true);
+      expect(result.hasDiff).toBe(false);
+      expect(result.written).toBe(false);
+    } finally {
+      // Restore original content
+      if (existsSync(SYSTEM_ADAPTERS_CLAUDE)) {
+        rmSync(SYSTEM_ADAPTERS_CLAUDE, { recursive: true });
+      }
+      if (existsSync(tempBackup)) {
+        require('fs').renameSync(tempBackup, SYSTEM_ADAPTERS_CLAUDE);
+      }
+    }
   });
 
   // Legacy syncClaudeCommands/syncClaudeSubagents tests (kept for backward compatibility)
 
   it('syncClaudeCommands returns sourceMissing when source does not exist', () => {
     // Ensure commands dir does not exist
-    if (existsSync(join(GLOBAL_CLAUDE_DIR, 'commands'))) {
-      rmSync(join(GLOBAL_CLAUDE_DIR, 'commands'), { recursive: true });
+    const commandsDir = join(SYSTEM_ADAPTERS_CLAUDE, 'commands');
+    if (existsSync(commandsDir)) {
+      rmSync(commandsDir, { recursive: true });
     }
     const result = syncClaudeCommands(testRepoRoot, false);
     expect(result.success).toBe(false);
@@ -528,7 +543,7 @@ describe('.claude directory sync', () => {
 
   it('syncClaudeCommands copies directory when source exists', () => {
     // Create source directory with test file
-    const srcDir = join(GLOBAL_CLAUDE_DIR, 'commands');
+    const srcDir = join(SYSTEM_ADAPTERS_CLAUDE, 'commands');
     mkdirSync(srcDir, { recursive: true });
     writeFileSync(join(srcDir, 'test-cmd.md'), '# Test Command\n', 'utf8');
 
@@ -543,8 +558,9 @@ describe('.claude directory sync', () => {
 
   it('syncClaudeSubagents returns sourceMissing when source does not exist', () => {
     // Ensure subagents dir does not exist
-    if (existsSync(join(GLOBAL_CLAUDE_DIR, 'subagents'))) {
-      rmSync(join(GLOBAL_CLAUDE_DIR, 'subagents'), { recursive: true });
+    const subagentsDir = join(SYSTEM_ADAPTERS_CLAUDE, 'subagents');
+    if (existsSync(subagentsDir)) {
+      rmSync(subagentsDir, { recursive: true });
     }
     const result = syncClaudeSubagents(testRepoRoot, false);
     expect(result.success).toBe(false);
@@ -553,7 +569,7 @@ describe('.claude directory sync', () => {
 
   it('syncClaudeSubagents copies directory when source exists', () => {
     // Create source directory with test file
-    const srcDir = join(GLOBAL_CLAUDE_DIR, 'subagents');
+    const srcDir = join(SYSTEM_ADAPTERS_CLAUDE, 'subagents');
     mkdirSync(srcDir, { recursive: true });
     writeFileSync(join(srcDir, 'test-agent.md'), '# Test Subagent\n', 'utf8');
 
@@ -568,7 +584,7 @@ describe('.claude directory sync', () => {
 
   it('syncClaudeCommands returns hasDiff=true, written=false when diff exists and force=false', () => {
     // Create source directory with new content
-    const srcDir = join(GLOBAL_CLAUDE_DIR, 'commands');
+    const srcDir = join(SYSTEM_ADAPTERS_CLAUDE, 'commands');
     mkdirSync(srcDir, { recursive: true });
     writeFileSync(join(srcDir, 'new-cmd.md'), '# New Command\n', 'utf8');
 
@@ -587,7 +603,7 @@ describe('.claude directory sync', () => {
 
   it('syncClaudeCommands overwrites when diff exists and force=true', () => {
     // Create source directory with new content
-    const srcDir = join(GLOBAL_CLAUDE_DIR, 'commands');
+    const srcDir = join(SYSTEM_ADAPTERS_CLAUDE, 'commands');
     mkdirSync(srcDir, { recursive: true });
     writeFileSync(join(srcDir, 'new-cmd.md'), '# New Command\n', 'utf8');
 
@@ -608,7 +624,7 @@ describe('.claude directory sync', () => {
 
   it('syncClaudeCommands returns hasDiff=false when content is identical', () => {
     // Create source directory with only test file
-    const srcDir = join(GLOBAL_CLAUDE_DIR, 'commands');
+    const srcDir = join(SYSTEM_ADAPTERS_CLAUDE, 'commands');
     if (existsSync(srcDir)) {
       rmSync(srcDir, { recursive: true });
     }
@@ -631,97 +647,57 @@ describe('knowledges sync', () => {
   const testRepoRoot = join(process.cwd(), 'test-repo-knowledges');
 
   beforeEach(() => {
-    backupAiResources();
+    backupSystem();
     mkdirSync(testRepoRoot, { recursive: true });
   });
 
   afterEach(() => {
-    restoreAiResources();
+    restoreSystem();
     if (existsSync(testRepoRoot)) {
       rmSync(testRepoRoot, { recursive: true });
     }
   });
 
-  it('getKnowledgeManifestPath returns correct path', () => {
-    const path = getKnowledgeManifestPath();
-    expect(path).toBe(
-      join(
-        homedir(),
-        'projects',
-        'ai-resources',
-        'vibe-coding-partner',
-        'claude',
-        'knowledge-manifest.txt'
-      )
-    );
-  });
-
-  it('getKnowledgesSourceDir returns correct path', () => {
-    const path = getKnowledgesSourceDir();
-    expect(path).toBe(
-      join(homedir(), 'projects', 'ai-resources', 'vibe-coding-partner', 'knowledges')
-    );
-  });
-
-  it('readKnowledgeManifest returns null when manifest does not exist', () => {
-    const manifestPath = getKnowledgeManifestPath();
-    if (existsSync(manifestPath)) {
-      rmSync(manifestPath);
+  it('syncKnowledges returns missingFiles when allowlist file not in system/docs/', () => {
+    // Remove one of the required files
+    const vdevFlowPath = join(SYSTEM_BASE, 'docs', 'flow', 'vdev-flow.md');
+    if (existsSync(vdevFlowPath)) {
+      rmSync(vdevFlowPath);
     }
-    const result = readKnowledgeManifest();
-    expect(result).toBe(null);
-  });
-
-  it('readKnowledgeManifest parses manifest correctly', () => {
-    setManifest('file1.md\nfile2.md\n\n# comment\nfile3.md\n');
-    const result = readKnowledgeManifest();
-    expect(result).toEqual(['file1.md', 'file2.md', 'file3.md']);
-  });
-
-  it('syncKnowledges returns manifestMissing when manifest does not exist', () => {
-    const manifestPath = getKnowledgeManifestPath();
-    if (existsSync(manifestPath)) {
-      rmSync(manifestPath);
-    }
-    const result = syncKnowledges(testRepoRoot, false);
-    expect(result.success).toBe(false);
-    expect(result.manifestMissing).toBe(true);
-  });
-
-  it('syncKnowledges returns missingFiles when manifest file not in knowledges/', () => {
-    setManifest('existing.md\nmissing.md\n');
-    setKnowledgeFile('existing.md', '# Existing\n');
-    // missing.md is not created
 
     const result = syncKnowledges(testRepoRoot, false);
     expect(result.success).toBe(false);
-    expect(result.missingFiles).toContain('missing.md');
+    expect(result.missingFiles.length).toBeGreaterThan(0);
   });
 
   it('syncKnowledges copies only allowlist files', () => {
-    setManifest('allowed1.md\nallowed2.md\n');
-    setKnowledgeFile('allowed1.md', '# Allowed 1\n');
-    setKnowledgeFile('allowed2.md', '# Allowed 2\n');
-    setKnowledgeFile('not-allowed.md', '# Not Allowed\n');
+    // Ensure allowlist files exist
+    setKnowledgeFile('vdev-flow.md', '# vdev Flow\n');
+    setKnowledgeFile('vdev-runtime-rules.md', '# Runtime Rules\n');
+    setKnowledgeFile('claude-output-format.md', '# Output Format\n');
 
     const result = syncKnowledges(testRepoRoot, false);
     expect(result.success).toBe(true);
     expect(result.written).toBe(true);
 
     const destDir = join(testRepoRoot, '.claude', 'knowledges');
-    expect(existsSync(join(destDir, 'allowed1.md'))).toBe(true);
-    expect(existsSync(join(destDir, 'allowed2.md'))).toBe(true);
-    expect(existsSync(join(destDir, 'not-allowed.md'))).toBe(false);
+    expect(existsSync(join(destDir, 'vdev-flow.md'))).toBe(true);
+    expect(existsSync(join(destDir, 'vdev-runtime-rules.md'))).toBe(true);
+    expect(existsSync(join(destDir, 'claude-output-format.md'))).toBe(true);
   });
 
   it('syncKnowledges returns hasDiff=false when content is identical', () => {
-    setManifest('file.md\n');
-    setKnowledgeFile('file.md', '# Content\n');
+    // Set up source files
+    setKnowledgeFile('vdev-flow.md', '# Content\n');
+    setKnowledgeFile('vdev-runtime-rules.md', '# Rules\n');
+    setKnowledgeFile('claude-output-format.md', '# Format\n');
 
     // Create existing directory with same content
     const destDir = join(testRepoRoot, '.claude', 'knowledges');
     mkdirSync(destDir, { recursive: true });
-    writeFileSync(join(destDir, 'file.md'), '# Content\n', 'utf8');
+    writeFileSync(join(destDir, 'vdev-flow.md'), '# Content\n', 'utf8');
+    writeFileSync(join(destDir, 'vdev-runtime-rules.md'), '# Rules\n', 'utf8');
+    writeFileSync(join(destDir, 'claude-output-format.md'), '# Format\n', 'utf8');
 
     const result = syncKnowledges(testRepoRoot, false);
     expect(result.success).toBe(true);
@@ -730,13 +706,17 @@ describe('knowledges sync', () => {
   });
 
   it('syncKnowledges detects diff when dest has extra files', () => {
-    setManifest('file.md\n');
-    setKnowledgeFile('file.md', '# Content\n');
+    // Set up source files
+    setKnowledgeFile('vdev-flow.md', '# Content\n');
+    setKnowledgeFile('vdev-runtime-rules.md', '# Rules\n');
+    setKnowledgeFile('claude-output-format.md', '# Format\n');
 
     // Create existing directory with extra file
     const destDir = join(testRepoRoot, '.claude', 'knowledges');
     mkdirSync(destDir, { recursive: true });
-    writeFileSync(join(destDir, 'file.md'), '# Content\n', 'utf8');
+    writeFileSync(join(destDir, 'vdev-flow.md'), '# Content\n', 'utf8');
+    writeFileSync(join(destDir, 'vdev-runtime-rules.md'), '# Rules\n', 'utf8');
+    writeFileSync(join(destDir, 'claude-output-format.md'), '# Format\n', 'utf8');
     writeFileSync(join(destDir, 'extra.md'), '# Extra\n', 'utf8');
 
     const result = syncKnowledges(testRepoRoot, false);
@@ -746,19 +726,23 @@ describe('knowledges sync', () => {
   });
 
   it('syncKnowledges removes extra files when force=true', () => {
-    setManifest('file.md\n');
-    setKnowledgeFile('file.md', '# Content\n');
+    // Set up source files
+    setKnowledgeFile('vdev-flow.md', '# Content\n');
+    setKnowledgeFile('vdev-runtime-rules.md', '# Rules\n');
+    setKnowledgeFile('claude-output-format.md', '# Format\n');
 
     // Create existing directory with extra file
     const destDir = join(testRepoRoot, '.claude', 'knowledges');
     mkdirSync(destDir, { recursive: true });
-    writeFileSync(join(destDir, 'file.md'), '# Content\n', 'utf8');
+    writeFileSync(join(destDir, 'vdev-flow.md'), '# Content\n', 'utf8');
+    writeFileSync(join(destDir, 'vdev-runtime-rules.md'), '# Rules\n', 'utf8');
+    writeFileSync(join(destDir, 'claude-output-format.md'), '# Format\n', 'utf8');
     writeFileSync(join(destDir, 'extra.md'), '# Extra\n', 'utf8');
 
     const result = syncKnowledges(testRepoRoot, true);
     expect(result.success).toBe(true);
     expect(result.written).toBe(true);
-    expect(existsSync(join(destDir, 'file.md'))).toBe(true);
+    expect(existsSync(join(destDir, 'vdev-flow.md'))).toBe(true);
     expect(existsSync(join(destDir, 'extra.md'))).toBe(false);
   });
 });
@@ -766,10 +750,9 @@ describe('knowledges sync', () => {
 describe('syncCommand with .claude directories', () => {
   const originalCwd = process.cwd();
   const testRepoRoot = join(process.cwd(), 'test-repo-sync-cmd');
-  const GLOBAL_CLAUDE_DIR = AI_RESOURCES_CLAUDE_DIR;
 
   beforeEach(() => {
-    backupAiResources();
+    backupSystem();
     mkdirSync(testRepoRoot, { recursive: true });
     process.chdir(testRepoRoot);
     setGlobalClaudeMd('# Test Rules\n');
@@ -777,7 +760,7 @@ describe('syncCommand with .claude directories', () => {
 
   afterEach(() => {
     process.chdir(originalCwd);
-    restoreAiResources();
+    restoreSystem();
     if (existsSync(testRepoRoot)) {
       rmSync(testRepoRoot, { recursive: true });
     }
@@ -793,23 +776,24 @@ describe('syncCommand with .claude directories', () => {
 
   it('syncCommand copies .claude directory when it exists', () => {
     // Create source directories
-    mkdirSync(join(GLOBAL_CLAUDE_DIR, 'commands'), { recursive: true });
-    mkdirSync(join(GLOBAL_CLAUDE_DIR, 'subagents'), { recursive: true });
-    writeFileSync(join(GLOBAL_CLAUDE_DIR, 'commands', 'cmd.md'), '# Cmd\n', 'utf8');
-    writeFileSync(join(GLOBAL_CLAUDE_DIR, 'subagents', 'agent.md'), '# Agent\n', 'utf8');
-    writeFileSync(join(GLOBAL_CLAUDE_DIR, 'reviewer-principles.md'), '# Principles\n', 'utf8');
+    mkdirSync(join(SYSTEM_ADAPTERS_CLAUDE, 'commands'), { recursive: true });
+    mkdirSync(join(SYSTEM_ADAPTERS_CLAUDE, 'subagents'), { recursive: true });
+    writeFileSync(join(SYSTEM_ADAPTERS_CLAUDE, 'commands', 'cmd.md'), '# Cmd\n', 'utf8');
+    writeFileSync(join(SYSTEM_ADAPTERS_CLAUDE, 'subagents', 'agent.md'), '# Agent\n', 'utf8');
+    writeFileSync(join(SYSTEM_ADAPTERS_CLAUDE, 'test-file.md'), '# Test\n', 'utf8');
 
-    // Create manifest and knowledges
-    setManifest('knowledge.md\n');
-    setKnowledgeFile('knowledge.md', '# Knowledge\n');
+    // Create knowledges
+    setKnowledgeFile('vdev-flow.md', '# Knowledge\n');
+    setKnowledgeFile('vdev-runtime-rules.md', '# Rules\n');
+    setKnowledgeFile('claude-output-format.md', '# Format\n');
 
     const result = syncCommand(true);
     expect(result.claudeDirResult?.success).toBe(true);
     expect(result.knowledgesResult?.success).toBe(true);
     expect(existsSync(join(testRepoRoot, '.claude', 'commands', 'cmd.md'))).toBe(true);
     expect(existsSync(join(testRepoRoot, '.claude', 'subagents', 'agent.md'))).toBe(true);
-    expect(existsSync(join(testRepoRoot, '.claude', 'reviewer-principles.md'))).toBe(true);
-    expect(existsSync(join(testRepoRoot, '.claude', 'knowledges', 'knowledge.md'))).toBe(true);
+    expect(existsSync(join(testRepoRoot, '.claude', 'test-file.md'))).toBe(true);
+    expect(existsSync(join(testRepoRoot, '.claude', 'knowledges', 'vdev-flow.md'))).toBe(true);
     // CLAUDE.md should NOT be in .claude/
     expect(existsSync(join(testRepoRoot, '.claude', 'CLAUDE.md'))).toBe(false);
   });
@@ -819,7 +803,7 @@ describe('newPlan with .claude directories', () => {
   let createdTopics: string[] = [];
 
   beforeEach(() => {
-    backupAiResources();
+    backupSystem();
     createdTopics = [];
     const plansDir = getPlansDir();
     mkdirSync(plansDir, { recursive: true });
@@ -827,7 +811,7 @@ describe('newPlan with .claude directories', () => {
   });
 
   afterEach(() => {
-    restoreAiResources();
+    restoreSystem();
     for (const topic of createdTopics) {
       removeTopic(topic);
     }

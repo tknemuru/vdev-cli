@@ -1,0 +1,22 @@
+# System Manifest
+# MyGPT / Claude 共通で参照すべき docs の集合を定義する
+
+version: "1.0"
+
+# 必須ドキュメント（参照必須）
+required:
+  - path: system/docs/flow/vdev-flow.md
+    description: vdev フロー定義（SoT）
+  - path: system/docs/spec/vdev-spec.md
+    description: vdev CLI 仕様書（SoT）
+  - path: system/docs/rules/vdev-runtime-rules.md
+    description: vdev ランタイムルール
+  - path: system/docs/formats/claude-output-format.md
+    description: Claude 出力フォーマット定義
+  - path: system/docs/maps/knowledge-map.md
+    description: ナレッジマップ
+  - path: system/docs/guides/vibe-coding-partner.md
+    description: Vibe Coding Partner ガイド（MyGPT knowledge 必須）
+
+# オプショナルドキュメント（必要に応じて参照）
+optional: []

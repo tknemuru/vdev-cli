@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "topic": "2026-01-24-review-implreview-hash-guard",
   "title": "Review Implreview Hash Guard",
-  "status": "NEEDS_IMPL_REVIEW",
+  "status": "DONE",
   "paths": {
     "instruction": "instruction.md",
     "plan": "plan.md",
@@ -14,10 +14,10 @@
     "planSha256": "3797365dc8b68a754913c25612c52ece2b6bb3596aba8f7efb40db8be682d5bc",
     "designReviewSha256": "786cd47311ea1ca811e597bfb26c7a43ae4fd6e01cef2d1709842cb44d84e57e",
     "implSha256": "88951d0fe82475827b4746fd341159a6a2457d550d02ec25117607b10e972a6c",
-    "implReviewSha256": null
+    "implReviewSha256": "471bc5ce2c04e3b6115674e6f45a7d9b264e727eb24036f201af6a41372a420b"
   },
   "timestamps": {
     "createdAt": "2026-01-24T00:16:49+09:00",
-    "updatedAt": "2026-01-24T00:33:16+09:00"
+    "updatedAt": "2026-01-24T00:47:37+09:00"
   }
 }

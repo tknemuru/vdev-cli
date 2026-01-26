@@ -4,7 +4,7 @@
 
 ### 1.1 本ドキュメントの目的
 
-本ドキュメントは vdev-cli の運用ガイドである。
+本ドキュメントは vdev CLI の運用ガイドである。
 状態（gate）別の許可操作、CLI 固有の注意点、同期・初期化コマンドの挙動を説明する。
 
 ### 1.2 本ドキュメントが扱わないこと
@@ -18,8 +18,8 @@
 
 ### 1.3 参照先
 
-- CLI 仕様: vdev-spec.md
-- フロー仕様: 別途定義されたフロー仕様を参照
+- CLI 仕様: system/docs/spec/vdev-spec.md
+- フロー仕様: system/docs/flow/vdev-flow.md
 
 ---
 
@@ -236,7 +236,7 @@ vdev new <name> [--force]
 1. `<name>` を slug 化し、日付プレフィックスを付与
 2. `docs/plans/<topic>/` ディレクトリを作成
 3. meta.json を初期状態（NEEDS_INSTRUCTION）で作成
-4. ai-resources から同期を試行（CLAUDE.md, vdev-flow.md, commands, subagents, knowledges）
+4. モノリポ内 system/ から同期を試行（CLAUDE.md, vdev-flow.md, commands, subagents, knowledges）
 
 **--force の効果**:
 - 差分があっても上書きする（topic 作成は常に実行）
@@ -251,23 +251,26 @@ vdev new <name> [--force]
 
 ### 5.2 vdev sync
 
-ai-resources から各種資産を同期する。
+モノリポ内 system/ から各種資産を同期する。
 
 ```bash
 vdev sync [--force]
 ```
 
-**同期元（固定）**:
+**同期元（モノリポ内 system/）**:
 ```
-~/projects/ai-resources/vibe-coding-partner/
-├── claude/
+<repo-root>/system/
+├── adapters/claude/
 │   ├── CLAUDE.md          → repo root/CLAUDE.md
 │   ├── commands/          → repo root/.claude/commands/
-│   ├── subagents/         → repo root/.claude/subagents/
-│   └── knowledge-manifest.txt
-└── knowledges/
-    ├── vdev-flow.md       → repo root/vdev-flow.md
-    └── *.md               → repo root/.claude/knowledges/ (allowlist のみ)
+│   └── subagents/         → repo root/.claude/subagents/
+├── docs/
+│   ├── flow/vdev-flow.md  → repo root/vdev-flow.md
+│   ├── rules/             → repo root/.claude/knowledges/ (allowlist)
+│   └── formats/           → repo root/.claude/knowledges/ (allowlist)
+└── registry/
+    ├── system.manifest.yaml  (参照必須 docs 集合)
+    └── claude.manifest.yaml  (配布定義)
 ```
 
 **デフォルト動作**（--force なし）:
@@ -285,7 +288,7 @@ vdev sync [--force]
 
 **配布元の構成**:
 ```
-~/projects/ai-resources/vibe-coding-partner/claude/
+<repo-root>/system/adapters/claude/
 ├── commands/
 │   └── *.md
 └── subagents/
@@ -306,11 +309,10 @@ vdev sync [--force]
 
 **配布元**:
 ```
-~/projects/ai-resources/vibe-coding-partner/
-├── claude/
-│   └── knowledge-manifest.txt  (allowlist)
-└── knowledges/
-    └── *.md
+<repo-root>/system/docs/
+├── flow/vdev-flow.md
+├── rules/vdev-runtime-rules.md
+└── formats/claude-output-format.md
 ```
 
 **同期先**:
@@ -318,19 +320,19 @@ vdev sync [--force]
 repo root/.claude/knowledges/
 ```
 
-**allowlist（knowledge-manifest.txt）の形式**:
-- 1 行 1 ファイル名（拡張子込み）
-- 空行は無視
-- `#` で始まる行はコメントとして無視
+**allowlist（ハードコード）**:
+- vdev-flow.md
+- vdev-runtime-rules.md
+- claude-output-format.md
 
 **同期ポリシー**:
-- manifest に記載されたファイルのみを同期する
-- manifest に記載されたファイルが knowledges/ に存在しない場合はエラーで停止
+- allowlist に記載されたファイルのみを同期する
+- allowlist に記載されたファイルが system/docs/ に存在しない場合はエラー
 - 同期先に余分なファイルがある場合は削除される（--force 時）
 
 **注意点**:
-- manifest が存在しない場合は警告のみ
 - knowledges の同期失敗は exit code に影響しない
+- 正本は system/docs/ に存在し、.claude/knowledges/ は配布先（互換ディレクトリ）
 
 ---
 

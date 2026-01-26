@@ -8,26 +8,31 @@ import {
   rmSync,
   copyFileSync,
 } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
+import { join, dirname } from 'path';
 import { nowJST } from './time';
 
 const LAST_SYNCED_PATTERN = /^<!-- Last synced: .* -->$/m;
 
-// ai-resources base path
-const AI_RESOURCES_BASE_PATH = join(
-  homedir(),
-  'projects',
-  'ai-resources',
-  'vibe-coding-partner'
-);
-
-export function getAiResourcesBasePath(): string {
-  return AI_RESOURCES_BASE_PATH;
+/**
+ * Get the system base path (monorepo system/ directory).
+ * The vdev CLI is located at <repo-root>/cli/, so system/ is at ../system/
+ * relative to the CLI package root.
+ *
+ * This function resolves the path based on the CLI's location.
+ */
+export function getSystemBasePath(): string {
+  // __dirname is cli/dist/core/ after compilation
+  // Go up to repo root and then to system/
+  const cliRoot = join(__dirname, '..', '..'); // cli/
+  const repoRoot = join(cliRoot, '..'); // repo root
+  return join(repoRoot, 'system');
 }
 
+/**
+ * Get path to CLAUDE.md source in system/adapters/claude/
+ */
 export function getGlobalClaudeMdPath(): string {
-  return join(AI_RESOURCES_BASE_PATH, 'claude', 'CLAUDE.md');
+  return join(getSystemBasePath(), 'adapters', 'claude', 'CLAUDE.md');
 }
 
 export function readGlobalClaudeMd(): string | null {
@@ -40,7 +45,7 @@ export function readGlobalClaudeMd(): string | null {
 
 export function renderRepoClaudeMd(globalBody: string, nowIso: string): string {
   const header = `<!-- AUTO-GENERATED FILE - DO NOT EDIT -->
-<!-- Source: ~/projects/ai-resources/vibe-coding-partner/claude/CLAUDE.md -->
+<!-- Source: system/adapters/claude/CLAUDE.md -->
 <!-- Last synced: ${nowIso} -->
 
 `;
@@ -91,7 +96,7 @@ export function syncClaudeMd(repoRoot: string, force: boolean): SyncResult {
       hasDiff: false,
       globalMissing: true,
       message:
-        'Global CLAUDE.md not found (~/projects/ai-resources/vibe-coding-partner/claude/CLAUDE.md)',
+        'CLAUDE.md not found in system/adapters/claude/',
     };
   }
 
@@ -126,14 +131,17 @@ export function syncClaudeMd(repoRoot: string, force: boolean): SyncResult {
     written: false,
     hasDiff: true,
     globalMissing: false,
-    message: 'CLAUDE.md differs from global rules',
+    message: 'CLAUDE.md differs from source',
   };
 }
 
 // vdev-flow.md sync functions
 
+/**
+ * Get path to vdev-flow.md source in system/docs/flow/
+ */
 export function getGlobalVdevFlowPath(): string {
-  return join(AI_RESOURCES_BASE_PATH, 'knowledges', 'vdev-flow.md');
+  return join(getSystemBasePath(), 'docs', 'flow', 'vdev-flow.md');
 }
 
 export function readGlobalVdevFlow(): string | null {
@@ -146,7 +154,7 @@ export function readGlobalVdevFlow(): string | null {
 
 export function renderRepoVdevFlow(globalBody: string, nowIso: string): string {
   const header = `<!-- AUTO-GENERATED FILE - DO NOT EDIT -->
-<!-- Source: ~/projects/ai-resources/vibe-coding-partner/knowledges/vdev-flow.md -->
+<!-- Source: system/docs/flow/vdev-flow.md -->
 <!-- Last synced: ${nowIso} -->
 
 `;
@@ -176,7 +184,7 @@ export function syncVdevFlow(repoRoot: string, force: boolean): SyncResult {
       hasDiff: false,
       globalMissing: true,
       message:
-        'Global vdev-flow.md not found (~/projects/ai-resources/vibe-coding-partner/knowledges/vdev-flow.md)',
+        'vdev-flow.md not found in system/docs/flow/',
     };
   }
 
@@ -211,14 +219,17 @@ export function syncVdevFlow(repoRoot: string, force: boolean): SyncResult {
     written: false,
     hasDiff: true,
     globalMissing: false,
-    message: 'vdev-flow.md differs from global rules',
+    message: 'vdev-flow.md differs from source',
   };
 }
 
 // .claude directory sync functions
 
+/**
+ * Get path to Claude adapters directory in system/adapters/claude/
+ */
 export function getGlobalClaudeDir(): string {
-  return join(AI_RESOURCES_BASE_PATH, 'claude');
+  return join(getSystemBasePath(), 'adapters', 'claude');
 }
 
 export interface DirSyncResult {
@@ -316,7 +327,8 @@ export function directoriesDiffer(
 
 // Excluded files when syncing claude/ directory to .claude/
 // CLAUDE.md is handled separately by syncClaudeMd() to repo root
-const CLAUDE_DIR_EXCLUDE_PATTERNS = ['CLAUDE.md'];
+// reviewer-principles.md is handled as a standalone file
+const CLAUDE_DIR_EXCLUDE_PATTERNS = ['CLAUDE.md', 'reviewer-principles.md'];
 
 export function syncClaudeDir(repoRoot: string, force: boolean): DirSyncResult {
   const srcDir = getGlobalClaudeDir();
@@ -328,7 +340,7 @@ export function syncClaudeDir(repoRoot: string, force: boolean): DirSyncResult {
       hasDiff: false,
       sourceMissing: true,
       message:
-        '~/projects/ai-resources/vibe-coding-partner/claude not found',
+        'system/adapters/claude not found',
     };
   }
 
@@ -387,7 +399,7 @@ export function syncClaudeCommands(repoRoot: string, force: boolean): DirSyncRes
       hasDiff: false,
       sourceMissing: true,
       message:
-        '~/projects/ai-resources/vibe-coding-partner/claude/commands not found',
+        'system/adapters/claude/commands not found',
     };
   }
 
@@ -443,7 +455,7 @@ export function syncClaudeSubagents(repoRoot: string, force: boolean): DirSyncRe
       hasDiff: false,
       sourceMissing: true,
       message:
-        '~/projects/ai-resources/vibe-coding-partner/claude/subagents not found',
+        'system/adapters/claude/subagents not found',
     };
   }
 
@@ -491,13 +503,15 @@ export function syncClaudeSubagents(repoRoot: string, force: boolean): DirSyncRe
 
 // knowledges sync functions
 
-export function getKnowledgeManifestPath(): string {
-  return join(AI_RESOURCES_BASE_PATH, 'claude', 'knowledge-manifest.txt');
-}
-
-export function getKnowledgesSourceDir(): string {
-  return join(AI_RESOURCES_BASE_PATH, 'knowledges');
-}
+/**
+ * Knowledges are now synced from system/docs/ based on claude.manifest.yaml.
+ * For simplicity, we use a hardcoded allowlist matching the manifest.
+ */
+const KNOWLEDGES_ALLOWLIST = [
+  { source: 'docs/flow/vdev-flow.md', target: 'vdev-flow.md' },
+  { source: 'docs/rules/vdev-runtime-rules.md', target: 'vdev-runtime-rules.md' },
+  { source: 'docs/formats/claude-output-format.md', target: 'claude-output-format.md' },
+];
 
 export interface KnowledgesSyncResult {
   success: boolean;
@@ -508,47 +522,15 @@ export interface KnowledgesSyncResult {
   message: string;
 }
 
-export function readKnowledgeManifest(): string[] | null {
-  const manifestPath = getKnowledgeManifestPath();
-  if (!existsSync(manifestPath)) {
-    return null;
-  }
-  const content = readFileSync(manifestPath, 'utf8');
-  const lines = content.split('\n');
-  const files: string[] = [];
-  for (const line of lines) {
-    const trimmed = line.trim();
-    // Skip empty lines and comment lines
-    if (trimmed === '' || trimmed.startsWith('#')) {
-      continue;
-    }
-    files.push(trimmed);
-  }
-  return files;
-}
-
 export function syncKnowledges(repoRoot: string, force: boolean): KnowledgesSyncResult {
-  const manifest = readKnowledgeManifest();
+  const systemBase = getSystemBasePath();
 
-  if (manifest === null) {
-    return {
-      success: false,
-      written: false,
-      hasDiff: false,
-      manifestMissing: true,
-      missingFiles: [],
-      message:
-        'knowledge-manifest.txt not found (~/projects/ai-resources/vibe-coding-partner/claude/knowledge-manifest.txt)',
-    };
-  }
-
-  // Check all files in manifest exist in knowledges directory
-  const knowledgesDir = getKnowledgesSourceDir();
+  // Check all files in allowlist exist
   const missingFiles: string[] = [];
-  for (const file of manifest) {
-    const srcPath = join(knowledgesDir, file);
+  for (const item of KNOWLEDGES_ALLOWLIST) {
+    const srcPath = join(systemBase, item.source);
     if (!existsSync(srcPath)) {
-      missingFiles.push(file);
+      missingFiles.push(item.source);
     }
   }
 
@@ -559,7 +541,7 @@ export function syncKnowledges(repoRoot: string, force: boolean): KnowledgesSync
       hasDiff: false,
       manifestMissing: false,
       missingFiles,
-      message: `Missing files in knowledges/: ${missingFiles.join(', ')}`,
+      message: `Missing files in system/: ${missingFiles.join(', ')}`,
     };
   }
 
@@ -569,10 +551,10 @@ export function syncKnowledges(repoRoot: string, force: boolean): KnowledgesSync
 
   let hasDiff = !destExists;
   if (!hasDiff) {
-    // Check if manifest files differ from dest
-    for (const file of manifest) {
-      const srcPath = join(knowledgesDir, file);
-      const destPath = join(destDir, file);
+    // Check if allowlist files differ from dest
+    for (const item of KNOWLEDGES_ALLOWLIST) {
+      const srcPath = join(systemBase, item.source);
+      const destPath = join(destDir, item.target);
       if (!existsSync(destPath)) {
         hasDiff = true;
         break;
@@ -584,11 +566,12 @@ export function syncKnowledges(repoRoot: string, force: boolean): KnowledgesSync
         break;
       }
     }
-    // Also check if dest has extra files not in manifest
+    // Also check if dest has extra files not in allowlist
     if (!hasDiff) {
+      const allowedTargets = KNOWLEDGES_ALLOWLIST.map((i) => i.target);
       const destFiles = readdirSync(destDir);
       for (const file of destFiles) {
-        if (!manifest.includes(file)) {
+        if (!allowedTargets.includes(file)) {
           hasDiff = true;
           break;
         }
@@ -614,10 +597,10 @@ export function syncKnowledges(repoRoot: string, force: boolean): KnowledgesSync
     }
     mkdirSync(destDir, { recursive: true });
 
-    // Copy only files in manifest
-    for (const file of manifest) {
-      const srcPath = join(knowledgesDir, file);
-      const destPath = join(destDir, file);
+    // Copy only files in allowlist
+    for (const item of KNOWLEDGES_ALLOWLIST) {
+      const srcPath = join(systemBase, item.source);
+      const destPath = join(destDir, item.target);
       copyFileSync(srcPath, destPath);
     }
 
@@ -641,4 +624,28 @@ export function syncKnowledges(repoRoot: string, force: boolean): KnowledgesSync
     missingFiles: [],
     message: '.claude/knowledges differs from source',
   };
+}
+
+// Deprecated: these functions are no longer used
+// Kept for backward compatibility but will return success with no-op
+
+export function getKnowledgeManifestPath(): string {
+  // No longer used - manifest is now in system/registry/claude.manifest.yaml
+  return join(getSystemBasePath(), 'registry', 'claude.manifest.yaml');
+}
+
+export function getKnowledgesSourceDir(): string {
+  // No longer used - knowledges are now in system/docs/
+  return join(getSystemBasePath(), 'docs');
+}
+
+export function readKnowledgeManifest(): string[] | null {
+  // No longer used - return null to trigger migration path
+  return null;
+}
+
+// Legacy export for backward compatibility
+export function getAiResourcesBasePath(): string {
+  // Deprecated: now returns system base path
+  return getSystemBasePath();
 }
