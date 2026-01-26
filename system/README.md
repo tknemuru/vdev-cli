@@ -15,18 +15,17 @@ system/
 ├── docs/           # 人間が読む正本ドキュメント（SoT）
 │   ├── flow/       # vdev-flow.md（フロー定義）
 │   ├── spec/       # vdev-spec.md（CLI 仕様）
-│   ├── rules/      # vdev-runtime-rules.md
-│   ├── formats/    # claude-output-format.md
-│   ├── maps/       # knowledge-map.md
 │   └── guides/     # vibe-coding-partner.md
 ├── registry/       # 参照・配布の定義（manifest）
-│   ├── system.manifest.yaml   # 参照必須 docs 集合
-│   └── claude.manifest.yaml   # 配布定義
+│   ├── claude.manifest.yaml    # Claude 配布定義（vdev sync 用）
+│   └── chatgpt.manifest.yaml   # ChatGPT(MyGPT) 手動設定定義
 ├── adapters/       # LLM アダプター固有資材
-│   └── claude/     # Claude Code 固有
-│       ├── CLAUDE.md
-│       ├── commands/
-│       └── subagents/
+│   ├── claude/     # Claude Code 固有
+│   │   ├── CLAUDE.md
+│   │   ├── commands/
+│   │   └── subagents/
+│   └── chatgpt/    # ChatGPT(MyGPT) 固有
+│       └── system-instruction.md
 └── README.md       # このファイル
 ```
 
@@ -34,19 +33,19 @@ system/
 
 1. **docs/ 配下は正本（SoT）**: 直接編集してよい。変更は `vdev sync` で配布される。
 2. **registry/ 配下は manifest**: 配布定義を変更する場合のみ編集する。
-3. **adapters/ 配下は LLM 固有資材**: Claude Code 固有の設定・コマンド・サブエージェント定義を配置する。
+3. **adapters/ 配下は LLM 固有資材**: Claude Code / ChatGPT 固有の設定を配置する。
 
 ## registry の意味
-
-### system.manifest.yaml
-
-MyGPT / Claude 共通で参照すべき docs の集合を定義する。
-MyGPT の knowledge upload や Claude Code の参照先として使用される。
 
 ### claude.manifest.yaml
 
 `vdev sync` が配布するコピー元/コピー先の定義を持つ。
 どのファイルをどこに配布するかを明示する。
+
+### chatgpt.manifest.yaml
+
+ChatGPT(MyGPT/GPTs) の人手設定を repo の SoT として管理する。
+vdev sync の配布対象ではなく、人手で設定すべき内容を明記する。
 
 ## 配布の概念
 

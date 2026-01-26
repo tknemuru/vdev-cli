@@ -33,8 +33,4 @@ knowledges:
   allowlist:
     - source: docs/flow/vdev-flow.md
       target: vdev-flow.md
-    - source: docs/rules/vdev-runtime-rules.md
-      target: vdev-runtime-rules.md
-    - source: docs/formats/claude-output-format.md
-      target: claude-output-format.md
   description: Claude Code knowledge ファイル（allowlist 方式）

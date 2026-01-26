@@ -1,0 +1,25 @@
+# ChatGPT (MyGPT/GPTs) Manual Configuration Manifest
+#
+# This manifest defines the manual configuration required for ChatGPT/MyGPT.
+# Unlike claude.manifest.yaml, this is NOT a distribution target for `vdev sync`.
+# Human operators use this as the SoT for manual setup in ChatGPT UI.
+
+version: "1.0"
+
+# System Instruction
+# The system instruction to paste into ChatGPT's "Instructions" field.
+system_instruction:
+  source: adapters/chatgpt/system-instruction.md
+  description: ChatGPT(MyGPT) のシステムインストラクション
+
+# Knowledge Uploads
+# Files to upload as "Knowledge" in ChatGPT UI.
+# Keep this minimal - only essential documents.
+knowledge_uploads:
+  - source: docs/flow/vdev-flow.md
+    description: vdev フロー定義（SoT）
+
+# Setup Notes
+# This is a manual configuration manifest. To set up ChatGPT/MyGPT:
+# 1. Copy the content of `adapters/chatgpt/system-instruction.md` to the Instructions field
+# 2. Upload `docs/flow/vdev-flow.md` as Knowledge
