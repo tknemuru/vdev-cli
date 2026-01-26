@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "topic": "2026-01-26-ops-cheatsheet-v3-reconcile-docs",
+  "title": "Ops Cheatsheet V3 Reconcile Docs",
+  "status": "DONE",
+  "paths": {
+    "instruction": "instruction.md",
+    "plan": "plan.md",
+    "designReview": "design-review.md",
+    "impl": "impl.md",
+    "implReview": "impl-review.md"
+  },
+  "hashes": {
+    "planSha256": "b99ad5e26ff7a6b0d966f1fa6d0e7e5d5fea0d292f690ef8cda4fd7bcbc3b375",
+    "designReviewSha256": "84dcf93a1db2403875f484e88d05e6aa2831d6b94d154000ea7ccc3e2e0657ad",
+    "implSha256": "76248aafe2135d31121c346c98aacbbe9d6f2261c8f4ce3141d0480f44fb13a6",
+    "implReviewSha256": "14055de60eb3b2e831a524249e4d4a11e69aece84c2c89414baa5c7affb253b2"
+  },
+  "timestamps": {
+    "createdAt": "2026-01-26T10:43:50+09:00",
+    "updatedAt": "2026-01-26T11:35:52+09:00"
+  }
+}
