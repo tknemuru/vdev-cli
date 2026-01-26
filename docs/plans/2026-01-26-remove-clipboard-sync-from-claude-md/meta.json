@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "topic": "2026-01-26-remove-clipboard-sync-from-claude-md",
+  "title": "Remove Clipboard Sync From Claude Md",
+  "status": "DONE",
+  "paths": {
+    "instruction": "instruction.md",
+    "plan": "plan.md",
+    "designReview": "design-review.md",
+    "impl": "impl.md",
+    "implReview": "impl-review.md"
+  },
+  "hashes": {
+    "planSha256": "6a046485b24f326cc7b16102e3e07c9314a5db533af91f1b0a535cc30607f4c8",
+    "designReviewSha256": "098cbb53ad4c908ce1818a897e7e8f310d73a88f28530cbeb1ee172b81e1f2a8",
+    "implSha256": "8db89adac50f018db7204f92fe0ab0963db14a1ad527491b00110b7ec835c833",
+    "implReviewSha256": "5f9da027f1bf3a7dfe7df3ed5753515ee689fae7022b713f26c0df5dce0d46c7"
+  },
+  "timestamps": {
+    "createdAt": "2026-01-26T23:31:12+09:00",
+    "updatedAt": "2026-01-26T23:40:16+09:00"
+  }
+}
