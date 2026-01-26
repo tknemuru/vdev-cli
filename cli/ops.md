@@ -305,14 +305,21 @@ vdev sync [--force]
 - 同期元が存在しない場合は警告のみ（exit code には影響しない）
 - .claude 資産の同期失敗は exit code に影響しない
 
-### 5.4 knowledges の同期（allowlist 方式）
+### 5.4 knowledges の同期（manifest 定義 allowlist 方式）
 
-**配布元**:
+**allowlist 定義元（SoT）**:
 ```
-<repo-root>/system/docs/
-├── flow/vdev-flow.md
-├── rules/vdev-runtime-rules.md
-└── formats/claude-output-format.md
+<repo-root>/system/registry/claude.manifest.yaml
+```
+
+**manifest 内の knowledges セクション例**:
+```yaml
+knowledges:
+  dest: .claude/knowledges/
+  allowlist:
+    - source: docs/flow/vdev-flow.md
+      target: vdev-flow.md
+  description: Claude Code knowledge ファイル（allowlist 方式）
 ```
 
 **同期先**:
@@ -320,18 +327,22 @@ vdev sync [--force]
 repo root/.claude/knowledges/
 ```
 
-**allowlist（ハードコード）**:
-- vdev-flow.md
-- vdev-runtime-rules.md
-- claude-output-format.md
-
 **同期ポリシー**:
-- allowlist に記載されたファイルのみを同期する
-- allowlist に記載されたファイルが system/docs/ に存在しない場合はエラー
+- manifest の `knowledges.allowlist` に記載されたファイルのみを同期する
+- allowlist に記載された source ファイルが存在しない場合は Warning/Error
 - 同期先に余分なファイルがある場合は削除される（--force 時）
 
+**manifest 読み込み時の挙動**:
+
+| ケース | 挙動 | 理由 |
+|-------|------|------|
+| manifest ファイルが存在しない | Warning、空の allowlist として扱う | 後方互換性維持 |
+| YAML パースエラー | Error、syncKnowledges 失敗 | 設定ミス検出 |
+| `knowledges.allowlist` キーが存在しない | Warning、空の allowlist として扱う | knowledges 未定義を許容 |
+
 **注意点**:
-- knowledges の同期失敗は exit code に影響しない
+- knowledges の同期失敗（Warning）は exit code に影響しない
+- manifest パースエラーは Error として報告されるが、全体の exit code には影響しない
 - 正本は system/docs/ に存在し、.claude/knowledges/ は配布先（互換ディレクトリ）
 
 ---

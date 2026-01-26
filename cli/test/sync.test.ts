@@ -35,6 +35,9 @@ let originalCommands: Map<string, string> = new Map();
 let originalSubagents: Map<string, string> = new Map();
 let originalKnowledges: Map<string, { path: string; content: string }[]> = new Map();
 let originalClaudeDirFiles: Map<string, string> = new Map();
+let originalManifest: string | null = null;
+
+const MANIFEST_PATH = join(SYSTEM_BASE, 'registry', 'claude.manifest.yaml');
 
 function backupSystem() {
   systemExisted = existsSync(SYSTEM_BASE);
@@ -67,11 +70,9 @@ function backupSystem() {
         }
       }
     }
-    // Backup knowledges from system/docs/
+    // Backup knowledges from system/docs/ (now manifest-driven, only vdev-flow.md)
     const knowledgeFiles = [
       { source: 'docs/flow/vdev-flow.md', target: 'vdev-flow.md' },
-      { source: 'docs/rules/vdev-runtime-rules.md', target: 'vdev-runtime-rules.md' },
-      { source: 'docs/formats/claude-output-format.md', target: 'claude-output-format.md' },
     ];
     for (const item of knowledgeFiles) {
       const srcPath = join(SYSTEM_BASE, item.source);
@@ -91,6 +92,10 @@ function backupSystem() {
           originalClaudeDirFiles.set(file, readFileSync(filePath, 'utf8'));
         }
       }
+    }
+    // Backup manifest
+    if (existsSync(MANIFEST_PATH)) {
+      originalManifest = readFileSync(MANIFEST_PATH, 'utf8');
     }
   }
 }
@@ -149,6 +154,12 @@ function restoreSystem() {
     }
   }
 
+  // Restore manifest
+  if (originalManifest !== null) {
+    mkdirSync(join(SYSTEM_BASE, 'registry'), { recursive: true });
+    writeFileSync(MANIFEST_PATH, originalManifest, 'utf8');
+  }
+
   // Reset state
   originalClaudeMd = null;
   originalVdevFlow = null;
@@ -156,6 +167,7 @@ function restoreSystem() {
   originalSubagents = new Map();
   originalKnowledges = new Map();
   originalClaudeDirFiles = new Map();
+  originalManifest = null;
 }
 
 function setGlobalClaudeMd(content: string) {
@@ -171,11 +183,9 @@ function removeGlobalClaudeMd() {
 }
 
 function setKnowledgeFile(filename: string, content: string) {
-  // Map target filename to source path
+  // Map target filename to source path (matches manifest allowlist)
   const mapping: Record<string, string> = {
     'vdev-flow.md': 'docs/flow/vdev-flow.md',
-    'vdev-runtime-rules.md': 'docs/rules/vdev-runtime-rules.md',
-    'claude-output-format.md': 'docs/formats/claude-output-format.md',
   };
   const sourcePath = mapping[filename];
   if (sourcePath) {
@@ -184,6 +194,46 @@ function setKnowledgeFile(filename: string, content: string) {
     writeFileSync(fullPath, content, 'utf8');
   }
 }
+
+function setManifest(content: string) {
+  mkdirSync(join(SYSTEM_BASE, 'registry'), { recursive: true });
+  writeFileSync(MANIFEST_PATH, content, 'utf8');
+}
+
+function removeManifest() {
+  if (existsSync(MANIFEST_PATH)) {
+    rmSync(MANIFEST_PATH);
+  }
+}
+
+// Default manifest with vdev-flow.md allowlist
+const DEFAULT_MANIFEST = `version: "1.0"
+
+main:
+  source: adapters/claude/CLAUDE.md
+  dest: CLAUDE.md
+  description: Claude Code 用実装規約
+
+flow:
+  source: docs/flow/vdev-flow.md
+  dest: vdev-flow.md
+  description: vdev フロー定義
+
+claude_dir:
+  source: adapters/claude/
+  dest: .claude/
+  exclude:
+    - CLAUDE.md
+    - reviewer-principles.md
+  description: Claude Code 設定ディレクトリ
+
+knowledges:
+  dest: .claude/knowledges/
+  allowlist:
+    - source: docs/flow/vdev-flow.md
+      target: vdev-flow.md
+  description: Claude Code knowledge ファイル（allowlist 方式）
+`;
 
 function removeTopic(topic: string) {
   const topicDir = getTopicDir(topic);
@@ -643,12 +693,14 @@ describe('.claude directory sync', () => {
   });
 });
 
-describe('knowledges sync', () => {
+describe('knowledges sync (manifest-driven)', () => {
   const testRepoRoot = join(process.cwd(), 'test-repo-knowledges');
 
   beforeEach(() => {
     backupSystem();
     mkdirSync(testRepoRoot, { recursive: true });
+    // Set up default manifest
+    setManifest(DEFAULT_MANIFEST);
   });
 
   afterEach(() => {
@@ -659,7 +711,7 @@ describe('knowledges sync', () => {
   });
 
   it('syncKnowledges returns missingFiles when allowlist file not in system/docs/', () => {
-    // Remove one of the required files
+    // Remove the required file (vdev-flow.md is the only one in manifest)
     const vdevFlowPath = join(SYSTEM_BASE, 'docs', 'flow', 'vdev-flow.md');
     if (existsSync(vdevFlowPath)) {
       rmSync(vdevFlowPath);
@@ -668,13 +720,12 @@ describe('knowledges sync', () => {
     const result = syncKnowledges(testRepoRoot, false);
     expect(result.success).toBe(false);
     expect(result.missingFiles.length).toBeGreaterThan(0);
+    expect(result.missingFiles).toContain('docs/flow/vdev-flow.md');
   });
 
-  it('syncKnowledges copies only allowlist files', () => {
-    // Ensure allowlist files exist
+  it('syncKnowledges copies only allowlist files from manifest', () => {
+    // Ensure allowlist file exists
     setKnowledgeFile('vdev-flow.md', '# vdev Flow\n');
-    setKnowledgeFile('vdev-runtime-rules.md', '# Runtime Rules\n');
-    setKnowledgeFile('claude-output-format.md', '# Output Format\n');
 
     const result = syncKnowledges(testRepoRoot, false);
     expect(result.success).toBe(true);
@@ -682,22 +733,19 @@ describe('knowledges sync', () => {
 
     const destDir = join(testRepoRoot, '.claude', 'knowledges');
     expect(existsSync(join(destDir, 'vdev-flow.md'))).toBe(true);
-    expect(existsSync(join(destDir, 'vdev-runtime-rules.md'))).toBe(true);
-    expect(existsSync(join(destDir, 'claude-output-format.md'))).toBe(true);
+    // These should NOT exist (not in manifest allowlist)
+    expect(existsSync(join(destDir, 'vdev-runtime-rules.md'))).toBe(false);
+    expect(existsSync(join(destDir, 'claude-output-format.md'))).toBe(false);
   });
 
   it('syncKnowledges returns hasDiff=false when content is identical', () => {
-    // Set up source files
+    // Set up source file
     setKnowledgeFile('vdev-flow.md', '# Content\n');
-    setKnowledgeFile('vdev-runtime-rules.md', '# Rules\n');
-    setKnowledgeFile('claude-output-format.md', '# Format\n');
 
     // Create existing directory with same content
     const destDir = join(testRepoRoot, '.claude', 'knowledges');
     mkdirSync(destDir, { recursive: true });
     writeFileSync(join(destDir, 'vdev-flow.md'), '# Content\n', 'utf8');
-    writeFileSync(join(destDir, 'vdev-runtime-rules.md'), '# Rules\n', 'utf8');
-    writeFileSync(join(destDir, 'claude-output-format.md'), '# Format\n', 'utf8');
 
     const result = syncKnowledges(testRepoRoot, false);
     expect(result.success).toBe(true);
@@ -706,17 +754,13 @@ describe('knowledges sync', () => {
   });
 
   it('syncKnowledges detects diff when dest has extra files', () => {
-    // Set up source files
+    // Set up source file
     setKnowledgeFile('vdev-flow.md', '# Content\n');
-    setKnowledgeFile('vdev-runtime-rules.md', '# Rules\n');
-    setKnowledgeFile('claude-output-format.md', '# Format\n');
 
     // Create existing directory with extra file
     const destDir = join(testRepoRoot, '.claude', 'knowledges');
     mkdirSync(destDir, { recursive: true });
     writeFileSync(join(destDir, 'vdev-flow.md'), '# Content\n', 'utf8');
-    writeFileSync(join(destDir, 'vdev-runtime-rules.md'), '# Rules\n', 'utf8');
-    writeFileSync(join(destDir, 'claude-output-format.md'), '# Format\n', 'utf8');
     writeFileSync(join(destDir, 'extra.md'), '# Extra\n', 'utf8');
 
     const result = syncKnowledges(testRepoRoot, false);
@@ -726,17 +770,13 @@ describe('knowledges sync', () => {
   });
 
   it('syncKnowledges removes extra files when force=true', () => {
-    // Set up source files
+    // Set up source file
     setKnowledgeFile('vdev-flow.md', '# Content\n');
-    setKnowledgeFile('vdev-runtime-rules.md', '# Rules\n');
-    setKnowledgeFile('claude-output-format.md', '# Format\n');
 
     // Create existing directory with extra file
     const destDir = join(testRepoRoot, '.claude', 'knowledges');
     mkdirSync(destDir, { recursive: true });
     writeFileSync(join(destDir, 'vdev-flow.md'), '# Content\n', 'utf8');
-    writeFileSync(join(destDir, 'vdev-runtime-rules.md'), '# Rules\n', 'utf8');
-    writeFileSync(join(destDir, 'claude-output-format.md'), '# Format\n', 'utf8');
     writeFileSync(join(destDir, 'extra.md'), '# Extra\n', 'utf8');
 
     const result = syncKnowledges(testRepoRoot, true);
@@ -744,6 +784,41 @@ describe('knowledges sync', () => {
     expect(result.written).toBe(true);
     expect(existsSync(join(destDir, 'vdev-flow.md'))).toBe(true);
     expect(existsSync(join(destDir, 'extra.md'))).toBe(false);
+  });
+
+  it('syncKnowledges returns error when manifest has YAML parse error', () => {
+    // Set invalid YAML manifest
+    setManifest('invalid: yaml: content: with: bad: syntax');
+
+    const result = syncKnowledges(testRepoRoot, false);
+    expect(result.success).toBe(false);
+    expect(result.manifestParseError).toBe(true);
+    expect(result.message).toContain('Failed to parse manifest');
+  });
+
+  it('syncKnowledges succeeds with warning when manifest file not found', () => {
+    // Remove manifest
+    removeManifest();
+
+    const result = syncKnowledges(testRepoRoot, false);
+    // Should succeed (for backward compatibility) but with empty allowlist
+    expect(result.success).toBe(true);
+    expect(result.manifestMissing).toBe(true);
+    expect(result.message).toContain('not found');
+  });
+
+  it('syncKnowledges succeeds with warning when knowledges.allowlist not defined', () => {
+    // Set manifest without knowledges section
+    setManifest(`version: "1.0"
+main:
+  source: adapters/claude/CLAUDE.md
+  dest: CLAUDE.md
+`);
+
+    const result = syncKnowledges(testRepoRoot, false);
+    // Should succeed with empty allowlist
+    expect(result.success).toBe(true);
+    expect(result.message).toContain('not defined');
   });
 });
 
@@ -756,6 +831,8 @@ describe('syncCommand with .claude directories', () => {
     mkdirSync(testRepoRoot, { recursive: true });
     process.chdir(testRepoRoot);
     setGlobalClaudeMd('# Test Rules\n');
+    // Set up manifest
+    setManifest(DEFAULT_MANIFEST);
   });
 
   afterEach(() => {
@@ -782,10 +859,8 @@ describe('syncCommand with .claude directories', () => {
     writeFileSync(join(SYSTEM_ADAPTERS_CLAUDE, 'subagents', 'agent.md'), '# Agent\n', 'utf8');
     writeFileSync(join(SYSTEM_ADAPTERS_CLAUDE, 'test-file.md'), '# Test\n', 'utf8');
 
-    // Create knowledges
+    // Create knowledges (only vdev-flow.md is in manifest allowlist)
     setKnowledgeFile('vdev-flow.md', '# Knowledge\n');
-    setKnowledgeFile('vdev-runtime-rules.md', '# Rules\n');
-    setKnowledgeFile('claude-output-format.md', '# Format\n');
 
     const result = syncCommand(true);
     expect(result.claudeDirResult?.success).toBe(true);
@@ -808,6 +883,8 @@ describe('newPlan with .claude directories', () => {
     const plansDir = getPlansDir();
     mkdirSync(plansDir, { recursive: true });
     setGlobalClaudeMd('# Test Rules\n');
+    // Set up manifest
+    setManifest(DEFAULT_MANIFEST);
   });
 
   afterEach(() => {
