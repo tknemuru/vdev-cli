@@ -325,10 +325,11 @@ export function directoriesDiffer(
   return false;
 }
 
-// Excluded files when syncing claude/ directory to .claude/
-// CLAUDE.md is handled separately by syncClaudeMd() to repo root
-// reviewer-principles.md is handled as a standalone file
-const CLAUDE_DIR_EXCLUDE_PATTERNS = ['CLAUDE.md', 'reviewer-principles.md'];
+// Get exclude patterns from manifest (defaults to ['CLAUDE.md'] if manifest missing/invalid)
+function getExcludePatterns(): string[] {
+  const result = getClaudeDirExclude();
+  return result.exclude;
+}
 
 export function syncClaudeDir(repoRoot: string, force: boolean): DirSyncResult {
   const srcDir = getGlobalClaudeDir();
@@ -344,9 +345,10 @@ export function syncClaudeDir(repoRoot: string, force: boolean): DirSyncResult {
     };
   }
 
+  const excludePatterns = getExcludePatterns();
   const destDir = join(repoRoot, '.claude');
   const destExists = existsSync(destDir);
-  const hasDiff = directoriesDiffer(srcDir, destDir, CLAUDE_DIR_EXCLUDE_PATTERNS);
+  const hasDiff = directoriesDiffer(srcDir, destDir, excludePatterns);
 
   // No difference - nothing to do
   if (!hasDiff) {
@@ -365,7 +367,7 @@ export function syncClaudeDir(repoRoot: string, force: boolean): DirSyncResult {
     if (destExists) {
       rmSync(destDir, { recursive: true });
     }
-    copyDirRecursive(srcDir, destDir, CLAUDE_DIR_EXCLUDE_PATTERNS);
+    copyDirRecursive(srcDir, destDir, excludePatterns);
 
     return {
       success: true,
@@ -503,7 +505,7 @@ export function syncClaudeSubagents(repoRoot: string, force: boolean): DirSyncRe
 
 // knowledges sync functions
 
-import { getKnowledgesAllowlist, KnowledgesAllowlistItem } from './manifest';
+import { getKnowledgesAllowlist, getClaudeDirExclude, KnowledgesAllowlistItem } from './manifest';
 
 export interface KnowledgesSyncResult {
   success: boolean;

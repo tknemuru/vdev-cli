@@ -24,7 +24,6 @@ claude_dir:
   dest: .claude/
   exclude:
     - CLAUDE.md  # Handled separately as main
-    - reviewer-principles.md  # Handled separately
   description: Claude Code 設定ディレクトリ
 
 # Knowledges distribution (allowlist)

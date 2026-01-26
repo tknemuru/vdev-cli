@@ -73,6 +73,42 @@ export function readClaudeManifest(): ManifestReadResult {
   }
 }
 
+export interface ClaudeDirExcludeResult {
+  exclude: string[];
+  warning?: string;
+  error?: string;
+}
+
+export function getClaudeDirExclude(): ClaudeDirExcludeResult {
+  const result = readClaudeManifest();
+
+  // File not found: Warning + default exclude (backward compatibility)
+  if (result.error === 'FILE_NOT_FOUND') {
+    return {
+      exclude: ['CLAUDE.md'], // Default: only exclude CLAUDE.md
+      warning: result.errorMessage,
+    };
+  }
+
+  // Parse error: Error + default exclude
+  if (result.error === 'PARSE_ERROR') {
+    return {
+      exclude: ['CLAUDE.md'],
+      error: result.errorMessage,
+    };
+  }
+
+  // claude_dir.exclude key does not exist: default to CLAUDE.md only
+  if (!result.manifest?.claude_dir?.exclude) {
+    return {
+      exclude: ['CLAUDE.md'],
+      warning: 'claude_dir.exclude not defined in manifest, using default',
+    };
+  }
+
+  return { exclude: result.manifest.claude_dir.exclude };
+}
+
 export function getKnowledgesAllowlist(): KnowledgesAllowlistResult {
   const result = readClaudeManifest();
 
