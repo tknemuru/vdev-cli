@@ -1,4 +1,4 @@
-# vdev Operations Guide（v2.0）
+# vdev Operations Guide（v3.0）
 
 ## 1. はじめに
 
@@ -144,8 +144,7 @@ cat impl-review.md | vdev impl-review <topic> --stdin
 **許可コマンド**: なし（読み取り専用）
 
 **注意点**:
-- 全ファイルのハッシュ整合が必須
-- ハッシュ不整合がある場合は BROKEN_STATE
+- 完了状態（読み取り専用）
 
 ---
 
@@ -167,9 +166,8 @@ cat impl-review.md | vdev impl-review <topic> --stdin
 **許可コマンド**: なし
 
 **代表的な原因**:
-- meta.json の手動編集
-- ファイルの直接編集によるハッシュ不整合
 - meta.json のパース失敗
+- トピックディレクトリ構造の破損
 
 **対応方法**:
 - CLI による修復コマンドは提供されない
@@ -177,23 +175,23 @@ cat impl-review.md | vdev impl-review <topic> --stdin
 
 ---
 
-## 3. 差戻し時の挙動
+## 3. 差戻し時の挙動（v3 追従）
 
 ### 3.1 設計差戻し（NEEDS_CHANGES）
 
-design-review に `Status: NEEDS_CHANGES` が記載された場合:
+design-review.md に `Status: NEEDS_CHANGES` が記載された場合:
 
-1. status は NEEDS_PLAN に戻る
-2. plan.md を修正し、`vdev plan` で再登録
-3. `vdev review` で再レビュー
+1. vdev gate で状態が NEEDS_PLAN に戻っていることを確認する
+2. plan.md（正本）を修正する
+3. 再度 design-review を実施する
 
 ### 3.2 実装差戻し（NEEDS_CHANGES）
 
-impl-review に `Status: NEEDS_CHANGES` が記載された場合:
+impl-review.md に `Status: NEEDS_CHANGES` が記載された場合:
 
-1. status は IMPLEMENTING に戻る
-2. 実装を修正し、`vdev impl` で再登録
-3. `vdev impl-review` で再レビュー
+1. vdev gate で状態が IMPLEMENTING に戻っていることを確認する
+2. 実装を修正し、impl.md（正本）を更新する
+3. 再度 impl-review を実施する
 
 ### 3.3 CLI が保証しない範囲
 
@@ -204,14 +202,13 @@ impl-review に `Status: NEEDS_CHANGES` が記載された場合:
 
 ## 4. CLI 運用上の注意点
 
-### 4.1 手動編集禁止
+### 4.1 正本と編集ポリシー（v3 追従）
 
-以下のファイル・ディレクトリを直接編集しない:
-
-- `docs/plans/<topic>/` 配下のファイル
-- `meta.json`
-
-手動編集は BROKEN_STATE の原因となる。
+- docs/plans/<topic>/ 配下の md は Canonical（正本）であり、直接編集してよい
+- .claude 配下のコピー生成物は修正対象外とする
+- vdev の各サブコマンドは必須手続きではない（補助）
+- 状態確認と次アクション判断は vdev gate を入口に行う
+- Status 行が規約外の場合は COMMAND_ERROR（exit 1）となるため、テンプレに従うこと
 
 ### 4.2 stdin と改行コード
 
