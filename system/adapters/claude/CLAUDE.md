@@ -198,132 +198,7 @@ Claude Code は、
 
 ---
 
-## 11. 成果物生成後の自動処理（vdev 登録・クリップボード同期）
-
-### 11.1 前提条件
-
-Claude Code が plan.md または impl.md を生成・更新した場合、
-以下の自動処理を試行する。
-
-### 11.2 Topic 特定ルール
-
-1. 作業ディレクトリが `docs/plans/<topic>/` 配下であることを確認する
-2. `<topic>` は `docs/plans/` 直下のディレクトリ名から取得する
-3. `meta.json` が存在する場合は `topic` フィールドと一致することを確認する
-4. いずれか満たせない場合は自動実行しない（推測禁止）
-
-### 11.3 plan.md 生成後の処理
-
-1. `vdev gate <topic>` を実行する
-2. status が `NEEDS_PLAN` の場合のみ続行する
-3. **ファイル存在・非空ガード**: 対象ファイルが存在し、かつ非空であることを確認する
-   - `test -s docs/plans/<topic>/plan.md` が失敗した場合は vdev を実行しない
-   - 停止理由（ファイル未検出、空など）をログに残す
-4. **絶対パス参照・pipefail 有効化**: 以下のコマンドを実行する
-   ```bash
-   set -o pipefail && cat docs/plans/<topic>/plan.md | vdev plan <topic> --stdin
-   ```
-   - `cat plan.md` のような相対パス参照は禁止（cwd 依存事故防止）
-   - pipefail により cat 失敗時は vdev が実行されない
-5. 実行結果（stdout / stderr / exit code）をログに残す
-6. vdev plan 成功後のクリップボード同期は、11.5 の条件を満たす場合のみ実行する
-
-### 11.4 impl.md 生成後の処理
-
-1. `vdev gate <topic>` を実行する
-2. status が `NEEDS_IMPL_REPORT` の場合のみ続行する
-3. **ファイル存在・非空ガード**: 対象ファイルが存在し、かつ非空であることを確認する
-   - `test -s docs/plans/<topic>/impl.md` が失敗した場合は vdev を実行しない
-   - 停止理由（ファイル未検出、空など）をログに残す
-4. **絶対パス参照・pipefail 有効化**: 以下のコマンドを実行する
-   ```bash
-   set -o pipefail && cat docs/plans/<topic>/impl.md | vdev impl <topic> --stdin
-   ```
-   - `cat impl.md` のような相対パス参照は禁止（cwd 依存事故防止）
-   - pipefail により cat 失敗時は vdev が実行されない
-5. 実行結果（stdout / stderr / exit code）をログに残す
-6. vdev impl 成功後のクリップボード同期は、11.5 の条件を満たす場合のみ実行する
-
-### 11.5 クリップボード同期（Human Escalation 時のみ）
-
-#### 11.5.1 位置付け
-
-クリップボード同期は **Human への共有・判断を容易にするための補助機構** である。
-
-- vdev の状態遷移・成功/失敗判定には一切影響しない **non-fatal 処理**
-- 実行されなかった場合でも、vdev plan / vdev impl の成功状態は維持される
-- **原則として実行しない**（デフォルト OFF）
-
-#### 11.5.2 実行条件（Human Escalation Policy 準拠）
-
-クリップボード同期を行うのは、以下の **いずれかに該当する場合のみ**:
-
-1. **意図レベルの変更が必要**（vdev-flow.md 14.6.2 より）
-   - 目的 / Outcome / 受入条件の変更が必要
-   - スコープ外作業が不可避
-   - プロダクト判断が必要
-
-2. **事故リスクが高い**（vdev-flow.md 14.6.2 より）
-   - 金銭・購入・外部影響の即時実害
-   - データ消失・権限漏れ・不可逆破壊
-   - 検証不能 / ロールバック不能な高不確実性
-
-3. **R3 トピック**において Human の最終 Approve / Merge が必要な段階
-
-#### 11.5.3 NEEDS_CHANGES は Human Escalation ではない
-
-`NEEDS_CHANGES`（設計差戻し・実装差戻し）は **通常運転** であり、Human Escalation に該当しない。
-
-- Design Review での差戻し → Implementer が plan.md を修正し再登録
-- Impl Review での差戻し → Implementer が実装を修正し再登録
-
-これらのケースでクリップボード同期は **行わない**。
-
-#### 11.5.4 技術的前提条件（WSL + Windows 環境のみ）
-
-実行する場合、以下を満たすこと:
-
-- `iconv` コマンドが存在すること
-- `/mnt/c/Windows/System32/clip.exe` が存在し、実行可能であること
-
-**実行コマンド（絶対パス参照）:**
-- plan の場合:
-  ```bash
-  set -o pipefail && cat docs/plans/<topic>/plan.md | iconv -f UTF-8 -t UTF-16LE | /mnt/c/Windows/System32/clip.exe
-  ```
-- impl の場合:
-  ```bash
-  set -o pipefail && cat docs/plans/<topic>/impl.md | iconv -f UTF-8 -t UTF-16LE | /mnt/c/Windows/System32/clip.exe
-  ```
-
-#### 11.5.5 失敗時の扱い
-
-- クリップボード同期は non-fatal とする
-- vdev コマンドの成功状態は維持する
-- スキップ理由をログに残す
-
-### 11.6 Gate 失敗時の対応
-
-status が期待値と異なる場合:
-- vdev コマンドは実行しない
-- 実際の status と、必要な次アクションを Human に報告する
-- 例:
-  - `NEEDS_DESIGN_REVIEW`: plan は既に登録済み、review が必要
-  - `DESIGN_APPROVED`: vdev start が必要
-  - `IMPLEMENTING`: impl.md を作成可能（plan 登録は不要）
-
-### 11.7 事故防止の検証（Verify）
-
-誤った cwd で vdev plan/impl が実行されないことを確認するため、
-以下の条件で上書き事故が起きないことを検証する:
-
-1. **存在しないファイルパス**: `test -s` が失敗し、vdev は実行されない
-2. **空ファイル**: `test -s` が失敗し、vdev は実行されない
-3. **pipefail 有効時の cat 失敗**: パイプ全体が失敗し、vdev に空入力が渡らない
-
----
-
-## 12. 必須ドキュメント規範（参照）
+## 11. 必須ドキュメント規範（参照）
 
 本セクションは vibe-coding-partner.md（SoT）の要約である。
 詳細は SoT を参照すること。
@@ -351,15 +226,15 @@ status が期待値と異なる場合:
 
 ---
 
-## 13. GitHub PR 自動作成（gh CLI）
+## 12. GitHub PR 自動作成（gh CLI）
 
-### 13.1 目的
+### 12.1 目的
 
 - Claude Code が実装完了時に GitHub CLI（gh）を用いて PR 作成を自動で試行する
 - PR 作成の有無・成否は vdev の DONE 判定に影響しない
 - PR 作成 = 完了ではない（impl-review の Status: DONE が必須）
 
-### 13.2 発火条件
+### 12.2 発火条件
 
 以下をすべて満たした場合に PR 作成を試行する：
 
@@ -368,7 +243,7 @@ status が期待値と異なる場合:
 3. impl.md を作成済みである
 4. `vdev impl <topic> --stdin` による登録が成功した直後である
 
-### 13.3 事前チェック（すべて必須）
+### 12.3 事前チェック（すべて必須）
 
 以下のチェックをすべて通過した場合のみ PR 作成を続行する。
 いずれかの失敗は non-fatal とし、失敗理由を impl.md に記録する。
@@ -382,7 +257,7 @@ status が期待値と異なる場合:
    - 例: `git checkout -b <topic>`
 6. **R3 Human Approve**: R3（高リスク）の場合、Human の最終 Approve を待つ
 
-### 13.4 PR 作成手順
+### 12.4 PR 作成手順
 
 1. **リモート push**: 未 push の場合は `git push -u origin HEAD` を実行する
 2. **既存 PR 確認**: `gh pr view --json url,state` で既存 PR を確認する
@@ -392,7 +267,7 @@ status が期待値と異なる場合:
 3. **新規 PR 作成**: `gh pr create --fill` を実行する
 4. **URL 記録**: 作成または検出した PR の URL を impl.md に追記する
 
-### 13.5 失敗時の扱い
+### 12.5 失敗時の扱い
 
 - gh 未導入、未認証、権限不足、ネットワークエラー等はすべて non-fatal
 - vdev impl の成功状態は維持する
@@ -401,7 +276,7 @@ status が期待値と異なる場合:
   - 失敗理由（エラーメッセージ）
   - Human が行うべき次の手順
 
-### 13.6 禁止事項
+### 12.6 禁止事項
 
 - PR の merge を実行しない
 - auto-merge を設定しない
@@ -410,20 +285,20 @@ status が期待値と異なる場合:
 
 ---
 
-## 14. Subagent 定義の参照（役割分離）
+## 13. Subagent 定義の参照（役割分離）
 
-### 14.1 前提
+### 13.1 前提
 
 subagent 定義は、リポジトリ内の `.claude/subagents/` に配置される。
 
-### 14.2 作業開始時の義務
+### 13.2 作業開始時の義務
 
 Claude Code は作業開始時に、以下の両定義を必ず読むこと:
 
 - `.claude/subagents/implementer.md`
 - `.claude/subagents/reviewer.md`
 
-### 14.3 役割混同禁止（厳守）
+### 13.3 役割混同禁止（厳守）
 
 - **Implementer** はレビュー成果物（design-review.md / impl-review.md）を作成しない。gate 判断（vdev review / vdev impl-review）を実行しない
 - **Reviewer** は実装を行わない。plan.md / impl.md を作成しない
@@ -434,9 +309,9 @@ Claude Code は作業開始時に、以下の両定義を必ず読むこと:
 
 ---
 
-## 15. 自律オーケストレーション既定（vdev-flow.md 準拠）
+## 14. 自律オーケストレーション既定（vdev-flow.md 準拠）
 
-### 15.1 基本原則
+### 14.1 基本原則
 
 Claude Code は、vdev gate の状態に基づいて次に実行すべきロールを判断し、
 topic 固有の instruction に自律指定がなくても自律オーケストレーションを既定動作とする。
@@ -445,12 +320,12 @@ topic 固有の instruction に自律指定がなくても自律オーケスト�
 - **差戻し（Status: NEEDS_CHANGES）は通常経路**であり、Reviewer ↔ Implementer の往復を自律で継続する
 - リスク分類（R1/R2/R3）に応じて完遂範囲が異なる
 
-### 15.2 リスク分類と自律完遂範囲
+### 14.2 リスク分類と自律完遂範囲
 
 - **R1（低）/ R2（中）**: DONE 後、PR merge まで自律で完遂する
 - **R3（高）**: DONE 後、Human 待ちで停止する（最終 Approve / Merge は Human が実行）
 
-### 15.3 Gate 分岐表（vdev-spec v2.0 準拠）
+### 14.3 Gate 分岐表（vdev-spec v2.0 準拠）
 
 | vdev gate 結果 | Exit Code | 次アクション | 担当ロール |
 |---------------|-----------|-------------|-----------|
@@ -465,21 +340,21 @@ topic 固有の instruction に自律指定がなくても自律オーケスト�
 | REJECTED | 17 | フロー終了（却下） | - |
 | BROKEN_STATE | 20 | 状態修復が必要 | Human |
 
-### 15.4 差戻し時の状態遷移
+### 14.4 差戻し時の状態遷移
 
 | レビュー種別 | Status: NEEDS_CHANGES 時の gate 戻り先 | 次コマンド | 担当 |
 |-------------|---------------------------------------|-----------|------|
 | Design Review (`vdev review`) | NEEDS_PLAN | `vdev plan <topic> --stdin` | Implementer |
 | Impl Review (`vdev impl-review`) | IMPLEMENTING | `vdev impl <topic> --stdin` | Implementer |
 
-### 15.5 自律オーケストレーションの実行
+### 14.5 自律オーケストレーションの実行
 
 `.claude/commands/vdev.md` を使用することで、vdev gate に基づく自律オーケストレーションを実行できる。
 vdev コマンドは状態判定と委譲のみを行い、副作用（PR 作成等）はロール（Implementer/Reviewer）に委譲する。
 
 ---
 
-## 16. Reviewer Principles
+## 15. Reviewer Principles
 
 Reviewer は、レビュー時に以下の原則を必ず前提とする。
 
@@ -487,9 +362,9 @@ Reviewer は、レビュー時に以下の原則を必ず前提とする。
 
 ---
 
-## 17. Canonical Artifact Integrity Rules（正本成果物の整合性規則）
+## 16. Canonical Artifact Integrity Rules（正本成果物の整合性規則）
 
-### 17.1 Canonical Files（正本成果物）
+### 16.1 Canonical Files（正本成果物）
 
 以下のファイルは vdev により hash 管理される Canonical（正本）成果物である。
 
@@ -497,24 +372,24 @@ Reviewer は、レビュー時に以下の原則を必ず前提とする。
 - docs/plans/<topic>/impl.md
 - docs/plans/<topic>/impl-review.md
 
-### 17.2 編集ルール（必須）
+### 16.2 編集ルール（必須）
 
 - Canonical 成果物は **必ず vdev コマンド経由でのみ更新すること**
 - git による直接編集、Write / Update 等の手動更新は禁止する
 - vdev を経由しない変更は、gate により BROKEN_STATE として検出される
 
-### 17.3 凍結ルール（状態遷移後）
+### 16.3 凍結ルール（状態遷移後）
 
 - 状態が **NEEDS_IMPL_REVIEW** に遷移した時点で、`impl.md` は凍結される
 - 以降の追加情報（PR URL、補足説明等）は `impl-review.md` の Attempt にのみ記載する
 - 凍結後に `impl.md` を変更することは禁止する
 
-### 17.4 Hash 整合性（DONE / REJECTED）
+### 16.4 Hash 整合性（DONE / REJECTED）
 
 - DONE / REJECTED 状態では、Canonical 成果物の hash 一致が必須である
 - hash mismatch が検出された場合、状態は BROKEN_STATE となる
 
-### 17.5 復旧手順（例外なし）
+### 16.5 復旧手順（例外なし）
 
 - BROKEN_STATE からの復旧は以下の手順のみ許可される
   1. 現在の内容で `vdev impl` を再実行し impl を再登録する
