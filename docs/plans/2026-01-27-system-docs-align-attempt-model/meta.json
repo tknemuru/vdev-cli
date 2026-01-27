@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "topic": "2026-01-27-system-docs-align-attempt-model",
+  "title": "System Docs Align Attempt Model",
+  "status": "DONE",
+  "paths": {
+    "instruction": "instruction.md",
+    "plan": "plan.md",
+    "designReview": "design-review.md",
+    "impl": "impl.md",
+    "implReview": "impl-review.md"
+  },
+  "hashes": {
+    "planSha256": "0d7185f89d605623f933c7f8d3467d12a56dc06280f0d59c266d6e4e09b20148",
+    "designReviewSha256": "1ca8c3b4ca8808f5dc4711692a1c3612d41a349062b97ad66e617dd91e1f48e2",
+    "implSha256": "d87dbfb4aca97d84057a55af680bb7872834369cad44cb9cef42d866d12462e4",
+    "implReviewSha256": "f5d9bf40ae44149b3f741f924f7f8bdfaabff55355a091ef18113a3bbf84352c"
+  },
+  "timestamps": {
+    "createdAt": "2026-01-27T12:53:35+09:00",
+    "updatedAt": "2026-01-27T13:50:22+09:00"
+  }
+}
