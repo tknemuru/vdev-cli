@@ -340,12 +340,15 @@ topic 固有の instruction に自律指定がなくても自律オーケスト�
 | REJECTED | 17 | フロー終了（却下） | - |
 | BROKEN_STATE | 20 | 状態修復が必要 | Human |
 
-### 14.4 差戻し時の状態遷移
+### 14.4 差戻し時の状態遷移（Attempt モデル準拠）
 
-| レビュー種別 | Status: NEEDS_CHANGES 時の gate 戻り先 | 次コマンド | 担当 |
-|-------------|---------------------------------------|-----------|------|
-| Design Review (`vdev review`) | NEEDS_PLAN | `vdev plan <topic> --stdin` | Implementer |
-| Impl Review (`vdev impl-review`) | IMPLEMENTING | `vdev impl <topic> --stdin` | Implementer |
+| レビュー種別 | Status: NEEDS_CHANGES 時の gate 戻り先 | 次アクション | 担当 |
+|-------------|---------------------------------------|-------------|------|
+| Design Review | NEEDS_DESIGN_REVIEW | 新しい design-review attempt を追加 | Reviewer |
+| Impl Review | IMPLEMENTING | 実装修正後、新しい impl-review attempt を追加 | Implementer → Reviewer |
+
+**注**: Attempt モデルでは、NEEDS_CHANGES は新しい attempt を追加することで解消する。
+旧 attempt は履歴として残るが、gate は常に最新 attempt のみを解釈する。
 
 ### 14.5 自律オーケストレーションの実行
 
@@ -384,10 +387,10 @@ Reviewer は、レビュー時に以下の原則を必ず前提とする。
 - 以降の追加情報（PR URL、補足説明等）は `impl-review.md` の Attempt にのみ記載する
 - 凍結後に `impl.md` を変更することは禁止する
 
-### 16.4 Hash 整合性（DONE / REJECTED）
+### 16.4 Hash 整合性
 
-- DONE / REJECTED 状態では、Canonical 成果物の hash 一致が必須である
-- hash mismatch が検出された場合、状態は BROKEN_STATE となる
+- hash 不一致はエラー条件ではない（vdev-spec.md 準拠）
+- vdev gate は正本から hash を再計算し meta.json を同期更新する
 
 ### 16.5 復旧手順（例外なし）
 
@@ -395,3 +398,35 @@ Reviewer は、レビュー時に以下の原則を必ず前提とする。
   1. 現在の内容で `vdev impl` を再実行し impl を再登録する
   2. `vdev impl-review` を再実行して再レビューする
 - DONE 状態のまま hash のみを更新する手段は存在しない
+
+---
+
+## 17. Attempt モデル（レビュー履歴）
+
+### 17.1 ディレクトリ構造
+
+design-review と impl-review は Attempt（履歴）を積む:
+
+```
+docs/plans/<topic>/
+├── design-review/
+│   ├── attempt-001.md
+│   └── attempt-002.md  ← 最新
+├── impl-review/
+│   └── attempt-001.md
+├── design-review.md     （旧形式、互換用）
+└── impl-review.md       （旧形式、互換用）
+```
+
+### 17.2 gate の解釈
+
+- attempt ディレクトリが存在する場合: 最新 attempt のみを解釈
+- attempt が無い場合: 旧単一ファイル（design-review.md / impl-review.md）を互換的に読む
+- 最新 attempt の Status が NEEDS_CHANGES の場合:
+  - design-review: gate は NEEDS_DESIGN_REVIEW (12) を返す
+  - impl-review: gate は IMPLEMENTING (14) を返す
+
+### 17.3 スタック回避
+
+- NEEDS_CHANGES は新しい attempt を追加することで解消する
+- 旧 attempt は履歴として残るが、gate は最新 attempt のみを見る
