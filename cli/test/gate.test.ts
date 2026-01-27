@@ -205,7 +205,7 @@ describe('gate logic v3', () => {
       expect(result.status).toBe('REJECTED');
     });
 
-    it('returns NEEDS_PLAN (11) when Status is NEEDS_CHANGES', () => {
+    it('returns NEEDS_DESIGN_REVIEW (12) when Status is NEEDS_CHANGES (Attempt model)', () => {
       createTopic(testTopic);
       writeMeta(testTopic, createValidMeta(testTopic, 'DESIGN_APPROVED'));
       writeFile(testTopic, 'instruction.md', '# Instruction');
@@ -213,8 +213,8 @@ describe('gate logic v3', () => {
       writeFile(testTopic, 'design-review.md', 'Status: NEEDS_CHANGES');
 
       const result = checkGate(testTopic);
-      expect(result.exitCode).toBe(ExitCode.NEEDS_PLAN);
-      expect(result.status).toBe('NEEDS_PLAN');
+      expect(result.exitCode).toBe(ExitCode.NEEDS_DESIGN_REVIEW);
+      expect(result.status).toBe('NEEDS_DESIGN_REVIEW');
     });
   });
 
@@ -483,6 +483,230 @@ describe('gate logic v3', () => {
 
       const result = checkGate(testTopic);
       expect(result.exitCode).toBe(ExitCode.NEEDS_DESIGN_REVIEW);
+    });
+  });
+
+  describe('Attempt model: design-review', () => {
+    function writeAttempt(topic: string, dir: string, filename: string, content: string) {
+      const topicDir = getTopicDir(topic);
+      const attemptDir = join(topicDir, dir);
+      mkdirSync(attemptDir, { recursive: true });
+      writeFileSync(join(attemptDir, filename), content);
+    }
+
+    it('reads latest attempt when attempt directory exists', () => {
+      createTopic(testTopic);
+      writeMeta(testTopic, createValidMeta(testTopic, 'NEEDS_DESIGN_REVIEW'));
+      writeFile(testTopic, 'instruction.md', '# Instruction');
+      writeFile(testTopic, 'plan.md', '# Plan');
+      writeAttempt(testTopic, 'design-review', 'attempt-001.md', 'Status: DESIGN_APPROVED');
+
+      const result = checkGate(testTopic);
+      expect(result.exitCode).toBe(ExitCode.DESIGN_APPROVED);
+      expect(result.status).toBe('DESIGN_APPROVED');
+    });
+
+    it('NEEDS_CHANGES in latest attempt returns NEEDS_DESIGN_REVIEW (12)', () => {
+      createTopic(testTopic);
+      writeMeta(testTopic, createValidMeta(testTopic, 'NEEDS_DESIGN_REVIEW'));
+      writeFile(testTopic, 'instruction.md', '# Instruction');
+      writeFile(testTopic, 'plan.md', '# Plan');
+      writeAttempt(testTopic, 'design-review', 'attempt-001.md', 'Status: NEEDS_CHANGES');
+
+      const result = checkGate(testTopic);
+      expect(result.exitCode).toBe(ExitCode.NEEDS_DESIGN_REVIEW);
+      expect(result.status).toBe('NEEDS_DESIGN_REVIEW');
+    });
+
+    it('REJECTED in latest attempt returns REJECTED (17)', () => {
+      createTopic(testTopic);
+      writeMeta(testTopic, createValidMeta(testTopic, 'NEEDS_DESIGN_REVIEW'));
+      writeFile(testTopic, 'instruction.md', '# Instruction');
+      writeFile(testTopic, 'plan.md', '# Plan');
+      writeAttempt(testTopic, 'design-review', 'attempt-001.md', 'Status: REJECTED');
+
+      const result = checkGate(testTopic);
+      expect(result.exitCode).toBe(ExitCode.REJECTED);
+      expect(result.status).toBe('REJECTED');
+    });
+
+    it('invalid Status in latest attempt returns COMMAND_ERROR (1)', () => {
+      createTopic(testTopic);
+      writeMeta(testTopic, createValidMeta(testTopic, 'NEEDS_DESIGN_REVIEW'));
+      writeFile(testTopic, 'instruction.md', '# Instruction');
+      writeFile(testTopic, 'plan.md', '# Plan');
+      writeAttempt(testTopic, 'design-review', 'attempt-001.md', 'Status: INVALID');
+
+      const result = checkGate(testTopic);
+      expect(result.exitCode).toBe(ExitCode.COMMAND_ERROR);
+      expect(result.status).toBe('COMMAND_ERROR');
+    });
+  });
+
+  describe('Attempt model: stack avoidance', () => {
+    function writeAttempt(topic: string, dir: string, filename: string, content: string) {
+      const topicDir = getTopicDir(topic);
+      const attemptDir = join(topicDir, dir);
+      mkdirSync(attemptDir, { recursive: true });
+      writeFileSync(join(attemptDir, filename), content);
+    }
+
+    it('uses latest attempt when multiple attempts exist (stack avoidance)', () => {
+      createTopic(testTopic);
+      writeMeta(testTopic, createValidMeta(testTopic, 'NEEDS_DESIGN_REVIEW'));
+      writeFile(testTopic, 'instruction.md', '# Instruction');
+      writeFile(testTopic, 'plan.md', '# Plan');
+      // attempt-001 is NEEDS_CHANGES (old, should be ignored)
+      writeAttempt(testTopic, 'design-review', 'attempt-001.md', 'Status: NEEDS_CHANGES');
+      // attempt-002 is DESIGN_APPROVED (latest, should be used)
+      writeAttempt(testTopic, 'design-review', 'attempt-002.md', 'Status: DESIGN_APPROVED');
+
+      const result = checkGate(testTopic);
+      expect(result.exitCode).toBe(ExitCode.DESIGN_APPROVED);
+      expect(result.status).toBe('DESIGN_APPROVED');
+    });
+
+    it('correctly sorts by numeric value not lexicographic', () => {
+      createTopic(testTopic);
+      writeMeta(testTopic, createValidMeta(testTopic, 'NEEDS_DESIGN_REVIEW'));
+      writeFile(testTopic, 'instruction.md', '# Instruction');
+      writeFile(testTopic, 'plan.md', '# Plan');
+      // Lexicographic: attempt-10 < attempt-2, but numeric: attempt-2 < attempt-10
+      writeAttempt(testTopic, 'design-review', 'attempt-2.md', 'Status: NEEDS_CHANGES');
+      writeAttempt(testTopic, 'design-review', 'attempt-10.md', 'Status: DESIGN_APPROVED');
+
+      const result = checkGate(testTopic);
+      expect(result.exitCode).toBe(ExitCode.DESIGN_APPROVED);
+      expect(result.status).toBe('DESIGN_APPROVED');
+    });
+  });
+
+  describe('Attempt model: impl-review', () => {
+    function writeAttempt(topic: string, dir: string, filename: string, content: string) {
+      const topicDir = getTopicDir(topic);
+      const attemptDir = join(topicDir, dir);
+      mkdirSync(attemptDir, { recursive: true });
+      writeFileSync(join(attemptDir, filename), content);
+    }
+
+    it('NEEDS_CHANGES in latest impl-review attempt returns IMPLEMENTING (14)', () => {
+      createTopic(testTopic);
+      writeMeta(testTopic, createValidMeta(testTopic, 'IMPLEMENTING'));
+      writeFile(testTopic, 'instruction.md', '# Instruction');
+      writeFile(testTopic, 'plan.md', '# Plan');
+      writeFile(testTopic, 'design-review.md', 'Status: DESIGN_APPROVED');
+      writeFile(testTopic, 'impl.md', '# Impl');
+      writeAttempt(testTopic, 'impl-review', 'attempt-001.md', 'Status: NEEDS_CHANGES');
+
+      const result = checkGate(testTopic);
+      expect(result.exitCode).toBe(ExitCode.IMPLEMENTING);
+      expect(result.status).toBe('IMPLEMENTING');
+    });
+
+    it('DONE in latest impl-review attempt returns DONE (0)', () => {
+      createTopic(testTopic);
+      writeMeta(testTopic, createValidMeta(testTopic, 'IMPLEMENTING'));
+      writeFile(testTopic, 'instruction.md', '# Instruction');
+      writeFile(testTopic, 'plan.md', '# Plan');
+      writeFile(testTopic, 'design-review.md', 'Status: DESIGN_APPROVED');
+      writeFile(testTopic, 'impl.md', '# Impl');
+      writeAttempt(testTopic, 'impl-review', 'attempt-001.md', 'Status: DONE');
+
+      const result = checkGate(testTopic);
+      expect(result.exitCode).toBe(ExitCode.DONE);
+      expect(result.status).toBe('DONE');
+    });
+
+    it('invalid Status in latest impl-review attempt returns COMMAND_ERROR (1)', () => {
+      createTopic(testTopic);
+      writeMeta(testTopic, createValidMeta(testTopic, 'IMPLEMENTING'));
+      writeFile(testTopic, 'instruction.md', '# Instruction');
+      writeFile(testTopic, 'plan.md', '# Plan');
+      writeFile(testTopic, 'design-review.md', 'Status: DESIGN_APPROVED');
+      writeFile(testTopic, 'impl.md', '# Impl');
+      writeAttempt(testTopic, 'impl-review', 'attempt-001.md', 'Status: INVALID');
+
+      const result = checkGate(testTopic);
+      expect(result.exitCode).toBe(ExitCode.COMMAND_ERROR);
+      expect(result.status).toBe('COMMAND_ERROR');
+    });
+
+    it('uses latest attempt for impl-review (stack avoidance)', () => {
+      createTopic(testTopic);
+      writeMeta(testTopic, createValidMeta(testTopic, 'IMPLEMENTING'));
+      writeFile(testTopic, 'instruction.md', '# Instruction');
+      writeFile(testTopic, 'plan.md', '# Plan');
+      writeFile(testTopic, 'design-review.md', 'Status: DESIGN_APPROVED');
+      writeFile(testTopic, 'impl.md', '# Impl');
+      // attempt-001 is NEEDS_CHANGES
+      writeAttempt(testTopic, 'impl-review', 'attempt-001.md', 'Status: NEEDS_CHANGES');
+      // attempt-002 is DONE (latest)
+      writeAttempt(testTopic, 'impl-review', 'attempt-002.md', 'Status: DONE');
+
+      const result = checkGate(testTopic);
+      expect(result.exitCode).toBe(ExitCode.DONE);
+      expect(result.status).toBe('DONE');
+    });
+  });
+
+  describe('Attempt model: backward compatibility', () => {
+    function writeAttempt(topic: string, dir: string, filename: string, content: string) {
+      const topicDir = getTopicDir(topic);
+      const attemptDir = join(topicDir, dir);
+      mkdirSync(attemptDir, { recursive: true });
+      writeFileSync(join(attemptDir, filename), content);
+    }
+
+    it('reads legacy design-review.md when no attempt dir exists', () => {
+      createTopic(testTopic);
+      writeMeta(testTopic, createValidMeta(testTopic, 'NEEDS_DESIGN_REVIEW'));
+      writeFile(testTopic, 'instruction.md', '# Instruction');
+      writeFile(testTopic, 'plan.md', '# Plan');
+      writeFile(testTopic, 'design-review.md', 'Status: DESIGN_APPROVED');
+
+      const result = checkGate(testTopic);
+      expect(result.exitCode).toBe(ExitCode.DESIGN_APPROVED);
+    });
+
+    it('reads legacy impl-review.md when no attempt dir exists', () => {
+      createTopic(testTopic);
+      writeMeta(testTopic, createValidMeta(testTopic, 'IMPLEMENTING'));
+      writeFile(testTopic, 'instruction.md', '# Instruction');
+      writeFile(testTopic, 'plan.md', '# Plan');
+      writeFile(testTopic, 'design-review.md', 'Status: DESIGN_APPROVED');
+      writeFile(testTopic, 'impl.md', '# Impl');
+      writeFile(testTopic, 'impl-review.md', 'Status: DONE');
+
+      const result = checkGate(testTopic);
+      expect(result.exitCode).toBe(ExitCode.DONE);
+    });
+
+    it('uses attempt dir when both attempt and legacy file exist', () => {
+      createTopic(testTopic);
+      writeMeta(testTopic, createValidMeta(testTopic, 'NEEDS_DESIGN_REVIEW'));
+      writeFile(testTopic, 'instruction.md', '# Instruction');
+      writeFile(testTopic, 'plan.md', '# Plan');
+      // Legacy file says REJECTED
+      writeFile(testTopic, 'design-review.md', 'Status: REJECTED');
+      // Attempt says DESIGN_APPROVED (should take precedence)
+      writeAttempt(testTopic, 'design-review', 'attempt-001.md', 'Status: DESIGN_APPROVED');
+
+      const result = checkGate(testTopic);
+      expect(result.exitCode).toBe(ExitCode.DESIGN_APPROVED);
+    });
+
+    it('falls back to legacy when attempt dir exists but is empty', () => {
+      createTopic(testTopic);
+      writeMeta(testTopic, createValidMeta(testTopic, 'NEEDS_DESIGN_REVIEW'));
+      writeFile(testTopic, 'instruction.md', '# Instruction');
+      writeFile(testTopic, 'plan.md', '# Plan');
+      writeFile(testTopic, 'design-review.md', 'Status: DESIGN_APPROVED');
+      // Create empty attempt dir
+      const attemptDir = join(getTopicDir(testTopic), 'design-review');
+      mkdirSync(attemptDir, { recursive: true });
+
+      const result = checkGate(testTopic);
+      expect(result.exitCode).toBe(ExitCode.DESIGN_APPROVED);
     });
   });
 });
