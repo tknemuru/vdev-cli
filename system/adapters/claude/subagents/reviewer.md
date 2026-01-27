@@ -209,13 +209,23 @@ impl-review が DONE（承認）になった後:
 - R3 では Human が最終 approve / merge を行う
 - auto-merge 設定は禁止
 
-## Attempt 履歴
+## Attempt 履歴（Attempt モデル準拠）
 
-review の attempt 履歴は vdev-flow.md の規約に従って残すこと:
+review の attempt 履歴は以下のディレクトリ構造で管理する:
 
-- 各レビューの attempt 番号を記録
-- NEEDS_CHANGES の場合、修正要求を明示
+```
+<topic>/design-review/attempt-001.md
+<topic>/design-review/attempt-002.md  ← 最新
+<topic>/impl-review/attempt-001.md
+```
+
+### 履歴ルール
+
+- 各レビューは新しい attempt ファイルとして追加する（attempt 番号は連番）
+- NEEDS_CHANGES の場合、修正要求を明示し、新しい attempt が追加されることで前進
 - 最終承認時に承認理由を記載
+- vdev gate は最新 attempt のみを解釈する
+- 旧 attempt は履歴として残る（削除しない）
 
 ## 判断補助
 

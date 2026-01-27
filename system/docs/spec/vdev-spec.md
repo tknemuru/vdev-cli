@@ -218,7 +218,7 @@ vdev gate は、以下の手順で判定を行う。
 | 4 | design-review.md なし | NEEDS_DESIGN_REVIEW | 12 |
 | 5 | design-review.md の Status 行が規約外 | COMMAND_ERROR | 1 |
 | 6 | design-review.md に Status: REJECTED | REJECTED | 17 |
-| 7 | design-review.md に Status: NEEDS_CHANGES | NEEDS_PLAN | 11 |
+| 7 | design-review に Status: NEEDS_CHANGES | NEEDS_DESIGN_REVIEW | 12 |
 | 8 | design-review.md に Status: DESIGN_APPROVED かつ status=IMPLEMENTING | IMPLEMENTING | 14 |
 | 9 | design-review.md に Status: DESIGN_APPROVED かつ status≠IMPLEMENTING | DESIGN_APPROVED | 13 |
 | 10 | impl.md なし（status=IMPLEMENTING） | NEEDS_IMPL_REPORT | 15 |
@@ -238,13 +238,39 @@ Status 行が規定の値・形式に一致せず、
 - vdev gate は COMMAND_ERROR（exit code: 1）を返す
 - この場合、状態遷移および meta.json 更新は行わない
 
-### 8.3 NEEDS_CHANGES の扱い（v3.0 明文化）
+### 8.3 NEEDS_CHANGES の扱い（v3.1 改訂）
 
-- design-review.md に Status: NEEDS_CHANGES がある場合
-  - 状態は NEEDS_PLAN に戻る
+- design-review（最新 attempt）に Status: NEEDS_CHANGES がある場合
+  - 状態は NEEDS_DESIGN_REVIEW に戻る
+  - 新しい attempt を追加することで前進する
 
-- impl-review.md に Status: NEEDS_CHANGES がある場合
+- impl-review（最新 attempt）に Status: NEEDS_CHANGES がある場合
   - 状態は IMPLEMENTING に戻る
+  - 実装修正後、新しい attempt を追加することで前進する
+
+### 8.4 Attempt モデル（v3.1 新設）
+
+#### レビュー成果物のディレクトリ構造
+
+design-review および impl-review は Attempt（履歴）方式で管理できる。
+
+```
+<topic>/design-review/attempt-001.md
+<topic>/design-review/attempt-002.md
+<topic>/impl-review/attempt-001.md
+```
+
+#### gate の解釈
+
+1. attempt ディレクトリ（design-review/ または impl-review/）が存在するか確認
+2. 存在する場合: attempt-*.md を列挙し、番号で最大のものを最新として採用
+3. 存在しない場合: 旧単一ファイル（design-review.md / impl-review.md）を互換的に読む
+4. 最新 attempt の Status を解釈して状態を導出
+
+#### 互換性
+
+- 旧形式（単一ファイル）の topic は引き続き解釈可能
+- attempt ディレクトリと旧単一ファイルが共存する場合、attempt が優先
 
 ---
 

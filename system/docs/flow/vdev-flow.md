@@ -88,8 +88,12 @@ vdev CLI（または運用上のゲート判定）は原則として **正本の
 ### 2.3 Rework（差戻し）時の戻り先
 差戻しは、指摘対象の成果物ステージへ戻す。
 
-- `design-review`で差戻し：`plan`へ戻る（必要に応じて `instruction` に差戻して良いが、原則は `plan` で吸収する）
-- `impl-review`で差戻し：`implementation`へ戻る（実装修正→再検証→`impl.md`更新）
+- `design-review`で差戻し（Status: NEEDS_CHANGES）：
+  - gate は NEEDS_DESIGN_REVIEW を返す
+  - Implementer は `plan.md` を修正し、Reviewer が新しい design-review attempt を追加することで前進する
+- `impl-review`で差戻し（Status: NEEDS_CHANGES）：
+  - gate は IMPLEMENTING を返す
+  - Implementer は実装を修正し、Reviewer が新しい impl-review attempt を追加することで前進する
 
 ### 2.4 Attempts（履歴）の位置付け
 - Attemptは監査・測定のための履歴であり、状態遷移には直接関与しない
@@ -163,13 +167,14 @@ hashes は監査・差分検知用メタであり、hash 不一致は状態破�
 ### 4.2 Attempts（レビュー履歴）
 レビュー往復を保存するため、Attemptを以下に積む。
 
-推奨パス：
-- `reviews/<topic_name>/design/attempt-001.md`
-- `reviews/<topic_name>/design/attempt-002.md`
-- `reviews/<topic_name>/impl/attempt-001.md`
-- `reviews/<topic_name>/impl/attempt-002.md`
+ディレクトリ構造：
+- `docs/plans/<topic>/design-review/attempt-001.md`
+- `docs/plans/<topic>/design-review/attempt-002.md`
+- `docs/plans/<topic>/impl-review/attempt-001.md`
+- `docs/plans/<topic>/impl-review/attempt-002.md`
 
 Attemptは上書き禁止。レビューのたびに新規作成する。
+vdev gate は最新 attempt のみを解釈する。
 
 ### 4.3 Attempt Minimal Format（必須項目）
 Attemptには判断記録のみを残し、ログ全文・diff全文の貼付は禁止。
@@ -208,19 +213,17 @@ Attemptには判断記録のみを残し、ログ全文・diff全文の貼付は
 
 ### 5.2 Design Review（正本＋Attempt＋ゲート）
 Reviewerはレビューごとに以下を必ず実施する。
-1) `reviews/<topic_name>/design/attempt-XXX.md` を新規作成  
-2) `design-review.md`（正本）を最新に更新  
-3) vdev reviewゲートを実行（正本のStatusを用いる）
+1) `docs/plans/<topic>/design-review/attempt-XXX.md` を新規作成
+2) vdev reviewゲートを実行（最新 attempt の Status を用いる）
 
 - 承認：Statusは `DESIGN_APPROVED`
-- 差戻し：Statusは vdev規約に従う（例：`NEEDS_CHANGES` 等）
+- 差戻し：Statusは `NEEDS_CHANGES`（gate は NEEDS_DESIGN_REVIEW を返す）
 
 ### 5.3 Implementation & Impl Review（正本＋Attempt＋ゲート）
 - Implementer：実装→テスト→`impl.md`（正本）作成・更新
 - Reviewer：diff/変更ファイル/テスト結果を確認し、
-  1) `reviews/<topic_name>/impl/attempt-XXX.md` を新規作成  
-  2) `impl-review.md`（正本）を更新  
-  3) vdev impl-reviewゲートを実行
+  1) `docs/plans/<topic>/impl-review/attempt-XXX.md` を新規作成
+  2) vdev impl-reviewゲートを実行（最新 attempt の Status を用いる）
 
 ---
 
@@ -492,7 +495,8 @@ meta.json 記述例は Appendix B を参照。
 - `CLAUDE.md`（SoT参照＋Claude Code運用規約）
 - `docs/subagents/implementer.md`
 - `docs/subagents/reviewer.md`
-- `reviews/<topic_name>/**`（Attempt履歴）
+- `docs/plans/<topic>/design-review/attempt-*.md`（Design Review Attempt 履歴）
+- `docs/plans/<topic>/impl-review/attempt-*.md`（Impl Review Attempt 履歴）
 - `docs/epics/<epic_id>/epic.md`（Epic 定義、非正本）
 - `docs/epics/<epic_id>/meta.json`（Epic manifest、非正本）
 - `docs/epics/<epic_id>/attachments/`（Epic 添付資料）

@@ -23,23 +23,27 @@ instruction.md を入力とし、以下の一連のフローを担当する:
 
 ### Design Review 差戻し時（Status: NEEDS_CHANGES）
 
-gate が NEEDS_PLAN に戻った場合:
+gate が NEEDS_DESIGN_REVIEW に戻った場合:
 
-1. design-review.md の指摘事項を確認する
+1. 最新の design-review attempt の指摘事項を確認する
 2. 指摘に基づき plan.md を修正する
 3. `vdev plan <topic> --stdin` で再登録する
 4. `vdev gate` を確認し、NEEDS_DESIGN_REVIEW になったら Reviewer へ handoff する
+
+（注: Attempt モデルでは、新しい design-review attempt が追加されることで前進する）
 
 ### Impl Review 差戻し時（Status: NEEDS_CHANGES）
 
 gate が IMPLEMENTING に戻った場合:
 
-1. impl-review.md の指摘事項（Must / Verify / 合格条件）を確認する
+1. 最新の impl-review attempt の指摘事項（Must / Verify / 合格条件）を確認する
 2. 指摘に基づき実装を修正する
 3. Verify を再実行し、合格を確認する
 4. impl.md を更新する
 5. `vdev impl <topic> --stdin` で再登録する
 6. `vdev gate` を確認し、NEEDS_IMPL_REVIEW になったら Reviewer へ handoff する
+
+（注: Attempt モデルでは、新しい impl-review attempt が追加されることで前進する）
 
 ## Handoff 規則
 
