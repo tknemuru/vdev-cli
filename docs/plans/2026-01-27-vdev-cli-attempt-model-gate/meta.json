@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "topic": "2026-01-27-vdev-cli-attempt-model-gate",
+  "title": "Vdev Cli Attempt Model Gate",
+  "status": "NEEDS_IMPL_REVIEW",
+  "paths": {
+    "instruction": "instruction.md",
+    "plan": "plan.md",
+    "designReview": "design-review.md",
+    "impl": "impl.md",
+    "implReview": "impl-review.md"
+  },
+  "hashes": {
+    "planSha256": "8ccd3ca419f67bc003e02dc548b5774f34d536866c97e35ea29503b9d22c521f",
+    "designReviewSha256": "401b6461810e213ebf23116b93262742998e21a3b26513dd59d6773c396094d6",
+    "implSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "implReviewSha256": null
+  },
+  "timestamps": {
+    "createdAt": "2026-01-27T11:35:21+09:00",
+    "updatedAt": "2026-01-27T11:54:11+09:00"
+  }
+}

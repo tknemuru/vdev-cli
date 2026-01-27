@@ -43,3 +43,11 @@ export function getImplPath(topic: string): string {
 export function getImplReviewPath(topic: string): string {
   return join(getTopicDir(topic), 'impl-review.md');
 }
+
+export function getDesignReviewDir(topic: string): string {
+  return join(getTopicDir(topic), 'design-review');
+}
+
+export function getImplReviewDir(topic: string): string {
+  return join(getTopicDir(topic), 'impl-review');
+}
